@@ -35,12 +35,32 @@ io.on('connection', (socket) => {
 
     // User registers their UID with the socket
     socket.on('register', (data) => {
-        const { uid, channelName } = data;
-        console.log(`User ${uid} registered for channel ${channelName}`);
+        const { uid, channelName, isAdmin } = data;
+        console.log(`User ${uid} (${isAdmin ? 'Admin' : 'Member'}) registered for channel ${channelName}`);
         userSockets[uid] = socket.id;
 
         // Join a room named after the channel
         socket.join(channelName);
+
+        // If a team member is joining, notify everyone in the channel
+        if (!isAdmin) {
+            io.to(channelName).emit('member-joined', {
+                uid: uid,
+                timestamp: Date.now()
+            });
+        }
+    });
+
+    // Handle admin leaving (ending the meeting)
+    socket.on('admin-left', (data) => {
+        const { channelName } = data;
+        io.to(channelName).emit('meeting-ended', {
+            message: 'The admin has ended the meeting',
+            timestamp: Date.now()
+        });
+
+        // Remove meeting from active meetings
+        activeMeetings = activeMeetings.filter(m => m.channelName !== channelName);
     });
 
     socket.on('disconnect', () => {
@@ -96,7 +116,8 @@ router.post('/meetings/create', (req, res) => {
         token,
         adminUid,
         startTime: new Date(),
-        isActive: true
+        isActive: true,
+        teamMembers: [] // Array to store team members in this meeting
     };
 
     activeMeetings.push(newMeeting);
@@ -154,7 +175,6 @@ router.get('/meetings/active', (req, res) => {
 // Join a meeting (team member endpoint)
 router.post('/meetings/join', (req, res) => {
     const { meetingId, userName } = req.body;
-    console.log(userName, meetingId);
 
     const meeting = activeMeetings.find(m => m.id === parseInt(meetingId));
 
@@ -167,6 +187,13 @@ router.post('/meetings/join', (req, res) => {
 
     // Generate a token for this team member
     const token = generateAgoraToken(meeting.channelName, memberUid);
+
+    // Add team member to the meeting
+    meeting.teamMembers.push({
+        uid: memberUid,
+        name: userName,
+        joinTime: new Date()
+    });
 
     res.status(200).json({
         meeting: {
@@ -189,8 +216,9 @@ router.get('/token', (req, res) => {
 
 app.use(router);
 
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 
 module.exports = app;
