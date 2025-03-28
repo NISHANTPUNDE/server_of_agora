@@ -143,6 +143,16 @@ router.get('/token', (req, res) => {
     res.json({ token });
 });
 
+router.get('/connectiontoagora', (req, res) => {
+    const appId = "e9d4b556259a45f18121742537c185ad";
+    const token = "006e9d4b556259a45f18121742537c185adIABEKyfGO0N91Y0Nt6qt4X3hEib8tZ6mVTKhc9JGYSvu4Ax+f9gAAAAAIgARfE/55hjoZwQAAQB21eZnAgB21eZnAwB21eZnBAB21eZn";
+    const channel = "testing";
+
+    res.send({ appId, token, channel });
+}
+
+);
+
 
 
 module.exports = router;
