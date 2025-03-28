@@ -39,7 +39,7 @@ router.post('/meetings/create', (req, res) => {
         return res.status(400).json({ error: 'Meeting name and admin name are required' });
     }
 
-    const channelName = `meeting-${Date.now()}-${meetingName.replace(/\s+/g, '-').toLowerCase()}`;
+    const channelName = `testing`;
     const adminUid = 1000; // Use a fixed UID for admin (e.g., 1000)
     const token = generateAgoraToken(channelName, adminUid);
 
@@ -142,5 +142,7 @@ router.get('/token', (req, res) => {
 
     res.json({ token });
 });
+
+
 
 module.exports = router;
