@@ -105,6 +105,13 @@ router.post('/meetings/mute-member', (req, res) => {
 
 // Get all active meetings (team member endpoint)
 router.get('/meetings/active', (req, res) => {
+    const { teamid } = req.query;
+    
+    // Check if teamid is provided and is either 19 or 20
+    if (!teamid || ![19, 20].includes(Number(teamid))) {
+        return res.status(403).json({ error: 'Unauthorized: Access restricted to team 19 and 20 only' });
+    }
+    
     res.status(200).json(activeMeetings);
 });
 
@@ -154,14 +161,14 @@ router.get('/token', (req, res) => {
     res.json({ token });
 });
 
-router.get('/connectiontoagora', (req, res) => {
-    const appId = "e9d4b556259a45f18121742537c185ad";
+// router.get('/connectiontoagora', (req, res) => {
+//     const appId = "e9d4b556259a45f18121742537c185ad";
 
-    const token = "006e9d4b556259a45f18121742537c185adIABEKyfGO0N91Y0Nt6qt4X3hEib8tZ6mVTKhc9JGYSvu4Ax+f9gAAAAAIgARfE/55hjoZwQAAQB21eZnAgB21eZnAwB21eZnBAB21eZn";
-    const channel = "testing";
-    res.send({ appId, token, channel });
-}
-);
+//     const token = "006e9d4b556259a45f18121742537c185adIABEKyfGO0N91Y0Nt6qt4X3hEib8tZ6mVTKhc9JGYSvu4Ax+f9gAAAAAIgARfE/55hjoZwQAAQB21eZnAgB21eZnAwB21eZnBAB21eZn";
+//     const channel = "testing";
+//     res.send({ appId, token, channel });
+// }
+// );
 
 
 

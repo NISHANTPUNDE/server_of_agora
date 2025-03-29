@@ -8,7 +8,7 @@ const AdminController = {
     createAdmin: async (req, res) => {
         try {
             console.log(req.body);
-            const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits } = req.body;
+            const { username, password, app_id, app_certificate, channel_name, token_id, adminlimits } = req.body;
 
             if (!username || typeof username !== "string") {
                 return res.status(400).json({ message: "❌ Username is required and must be a string." });
