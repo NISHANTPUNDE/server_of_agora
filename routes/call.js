@@ -39,6 +39,12 @@ router.post('/meetings/create', (req, res) => {
         return res.status(400).json({ error: 'Meeting name and admin name are required' });
     }
 
+    // Deactivate all currently active meetings
+    activeMeetings = activeMeetings.map(meeting => ({
+        ...meeting,
+        isActive: false
+    }));
+
     const channelName = `testing`;
     const adminUid = 1000; // Use a fixed UID for admin (e.g., 1000)
     const token = generateAgoraToken(channelName, adminUid);
@@ -46,6 +52,7 @@ router.post('/meetings/create', (req, res) => {
     const newMeeting = {
         id: Date.now(),
         name: meetingName,
+        APP_ID,
         adminName,
         channelName,
         token,
@@ -105,7 +112,7 @@ router.get('/meetings/active', (req, res) => {
 router.post('/meetings/join', (req, res) => {
     const { meetingId, userName } = req.body;
 
-    const meeting = activeMeetings.find(m => m.id === parseInt(meetingId));
+    const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
 
     if (!meeting) {
         return res.status(404).json({ error: 'Meeting not found or no longer active' });
@@ -128,7 +135,11 @@ router.post('/meetings/join', (req, res) => {
         meeting: {
             ...meeting,
             token: token,  // Send the team member-specific token
-            uid: memberUid  // Send the member's UID
+            uid: memberUid,  // Send the member's UID
+            permissionInfo: {
+                required: ['camera', 'microphone'],
+                instructions: 'Please allow access to your camera and microphone when prompted by the browser.'
+            }
         }
     });
 });
@@ -145,12 +156,11 @@ router.get('/token', (req, res) => {
 
 router.get('/connectiontoagora', (req, res) => {
     const appId = "e9d4b556259a45f18121742537c185ad";
+
     const token = "006e9d4b556259a45f18121742537c185adIABEKyfGO0N91Y0Nt6qt4X3hEib8tZ6mVTKhc9JGYSvu4Ax+f9gAAAAAIgARfE/55hjoZwQAAQB21eZnAgB21eZnAwB21eZnBAB21eZn";
     const channel = "testing";
-
     res.send({ appId, token, channel });
 }
-
 );
 
 

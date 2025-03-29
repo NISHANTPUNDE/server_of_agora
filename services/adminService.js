@@ -86,7 +86,22 @@ const AdminService = {
                 resolve(result);
             });
         });
-    }
+    },
+    loginAdmin: async (username) => {
+        return new Promise((resolve, reject) => {
+            const sql = `SELECT * FROM admin WHERE username = ?`;
+            db.query(sql, [username], (err, results) => {
+                if (err) {
+                    console.error("Database Error:", err);
+                    return reject(err);
+                }
+                if (results.length === 0) {
+                    return resolve(null);
+                }
+                resolve(results[0]);
+            });
+        });
+    },
 };
 
 module.exports = AdminService;

@@ -15,9 +15,9 @@ const TeamController = {
                 return res.status(400).json({ message: "❌ username is required and must be a string." });
             }
 
-            if (!email || typeof email !== "string") {
-                return res.status(400).json({ message: "❌ Email is required and must be a string." });
-            }
+            // if (!email || typeof email !== "string") {
+            //     return res.status(400).json({ message: "❌ Email is required and must be a string." });
+            // }
 
             if (!mobilenumber || typeof mobilenumber !== "string") {
                 return res.status(400).json({ message: "❌ Mobile number is required and must be a string." });

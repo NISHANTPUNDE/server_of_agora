@@ -69,10 +69,10 @@ app.use(cors());
 app.use(express.json());
 
 
-// app.use('/v1/superadmin', superadmin);
-// app.use('/v1/admin', admin);
+app.use('/v1/superadmin', superadmin);
+app.use('/v1/admin', admin);
 app.use('/v1/call', call);
-// app.use('/v1/team', team);
+app.use('/v1/team', team);
 
 // app.use('/v1/user', user);
 

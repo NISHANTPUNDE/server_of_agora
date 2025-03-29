@@ -4,11 +4,11 @@ const db = require('../config/db');
 const TeamService = {
     createTeam: async (teamData) => {
         return new Promise((resolve, reject) => {
-            const { name, email, username, password, admin_id, mobilenumber } = teamData;
+            const { name, username, password, admin_id, mobilenumber } = teamData;
 
-            const sql = `INSERT INTO team (name,email, username, password, admin_id, mobilenumber) VALUES (?, ?, ?, ?, ?, ?)`;
+            const sql = `INSERT INTO team (name, username, password, admin_id, mobilenumber) VALUES (?, ?, ?, ?, ?)`;
 
-            db.query(sql, [name, email, username, password, admin_id, mobilenumber], (err, result) => {
+            db.query(sql, [name, username, password, admin_id, mobilenumber], (err, result) => {
                 if (err) {
                     console.error("Database Error:", err);
                     return reject(err);
@@ -85,6 +85,7 @@ const TeamService = {
             });
         });
     },
+    
     updateTeam: async (teamId, teamData) => {
         return new Promise((resolve, reject) => {
             const { name, email, username, password, admin_id, mobilenumber } = teamData;
