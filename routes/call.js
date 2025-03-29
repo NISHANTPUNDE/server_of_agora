@@ -105,13 +105,13 @@ router.post('/meetings/mute-member', (req, res) => {
 
 // Get all active meetings (team member endpoint)
 router.get('/meetings/active', (req, res) => {
-    const { teamid } = req.query;
-    
-    // Check if teamid is provided and is either 19 or 20
-    if (!teamid || ![19, 20].includes(Number(teamid))) {
-        return res.status(403).json({ error: 'Unauthorized: Access restricted to team 19 and 20 only' });
-    }
-    
+    // const { teamid } = req.query;
+
+    // // Check if teamid is provided and is either 19 or 20
+    // if (!teamid || ![19, 20].includes(Number(teamid))) {
+    //     return res.status(403).json({ error: 'Unauthorized: Access restricted to team 19 and 20 only' });
+    // }
+
     res.status(200).json(activeMeetings);
 });
 
