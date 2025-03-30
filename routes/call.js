@@ -177,7 +177,7 @@ router.get('/meetings/active', (req, res) => {
 
         // Filter active meetings where admin name matches
         const filteredMeetings = activeMeetings.filter(meeting =>
-            meeting.adminName === result[0].name
+            meeting.adminName === result[0].name && meeting.isActive === true
         );
 
         res.status(200).json(filteredMeetings);
