@@ -174,18 +174,16 @@ const TeamService = {
     // }
     updateTeam: async (teamId, teamData) => {
         return new Promise((resolve, reject) => {
-            // Extract provided fields from teamData
-            const fields = Object.keys(teamData);
-            const values = Object.values(teamData);
+            // Remove undefined or null values
+            const fields = Object.keys(teamData).filter(field => teamData[field] !== undefined && teamData[field] !== null);
+            const values = fields.map(field => teamData[field]);
 
             if (fields.length === 0) {
-                return reject(new Error("No fields provided for update."));
+                return reject(new Error("No valid fields provided for update."));
             }
 
             // Dynamically create SET clause
-            const setClause = fields.map((field) => `${field} = ?`).join(", ");
-
-            // SQL query with dynamic fields
+            const setClause = fields.map(field => `${field} = ?`).join(", ");
             const sql = `UPDATE team SET ${setClause} WHERE id = ?`;
 
             // Push teamId at the end for the WHERE clause
@@ -200,6 +198,7 @@ const TeamService = {
             });
         });
     }
+
 
 };
 

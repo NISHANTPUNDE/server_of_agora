@@ -5,10 +5,10 @@ const AdminService = {
         return new Promise((resolve, reject) => {
             console.log("admin data", adminData);
             const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name } = adminData;
-    
+
             // First, check if the username already exists
             const checkSql = `SELECT username FROM admin WHERE username = ?`;
-    
+
             db.query(checkSql, [username], (err, results) => {
                 if (err) {
                     console.error("Database Error:", err);
@@ -18,11 +18,11 @@ const AdminService = {
                     // Username already exists, return an error
                     return reject({ message: "❌ Username not available. Please use another username." });
                 }
-    
+
                 // If username doesn't exist, proceed with insertion
                 const insertSql = `INSERT INTO admin (username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name) 
                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    
+
                 db.query(insertSql, [username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name], (err, result) => {
                     if (err) {
                         console.error("Database Error:", err);
@@ -32,7 +32,7 @@ const AdminService = {
                 });
             });
         });
-    },    
+    },
     listAdmins: async (pagesize, offset, search) => {
         return new Promise((resolve, reject) => {
             let sql, queryParams;
@@ -90,22 +90,23 @@ const AdminService = {
         });
     },
     updateAdmin: async (adminId, adminData) => {
+        console.log(adminData)
         return new Promise((resolve, reject) => {
             const fields = [];
             const values = [];
-    
+
             Object.entries(adminData).forEach(([key, value]) => {
                 fields.push(`${key} = ?`);
                 values.push(value);
             });
-    
+
             if (fields.length === 0) {
                 return reject(new Error("No fields provided for update."));
             }
-    
+
             values.push(adminId); // Add ID for WHERE condition
             const sql = `UPDATE admin SET ${fields.join(", ")} WHERE id = ?`;
-    
+
             db.query(sql, values, (err, result) => {
                 if (err) {
                     console.error("Database Error:", err);
@@ -115,7 +116,7 @@ const AdminService = {
             });
         });
     },
-    
+
     loginAdmin: async (username) => {
         return new Promise((resolve, reject) => {
             const sql = `SELECT * FROM admin WHERE username = ?`;

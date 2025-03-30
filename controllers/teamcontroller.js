@@ -19,9 +19,6 @@ const TeamController = {
             //     return res.status(400).json({ message: "❌ Email is required and must be a string." });
             // }
 
-            if (!mobilenumber || typeof mobilenumber !== "string") {
-                return res.status(400).json({ message: "❌ Mobile number is required and must be a string." });
-            }
 
             if (!password || typeof password !== "string") {
                 return res.status(400).json({ message: "❌ Password is required and must be a string." });
@@ -32,9 +29,9 @@ const TeamController = {
             }
 
             // Hash the password
-            const hashedPassword = await bcrypt.hash(password.toString(), 10);
+            // const hashedPassword = await bcrypt.hash(password.toString(), 10);
 
-            const teamData = { name, password: hashedPassword, username, email, admin_id, mobilenumber, tokenid, Channelid, createdby };
+            const teamData = { name, password, username, email, admin_id, mobilenumber, tokenid, Channelid, createdby };
 
             // Call service function to create team
             const result = await teamService.createTeam(teamData);
@@ -93,7 +90,7 @@ const TeamController = {
                     return res.status(401).json({ message: '❌ Incorrect password' });
                 }
 
-                res.json({ message: '✅ Login successful!', teamId: team.id });
+                res.json({ message: '✅ Login successful!', user: team });
             });
         } catch (error) {
             console.error('❌ Error during login:', error);
@@ -103,13 +100,13 @@ const TeamController = {
     updateTeam: async (req, res) => {
         try {
             const { id } = req.params;
-            const { name, username,  email, admin_id, mobilenumber , tokenid, Channelid} = req.body;
+            const { name, username, email, admin_id, mobilenumber, tokenid, Channelid, status, password } = req.body;
 
-            console.log("req update",req.body)
+            console.log("req update", req.body)
             // Hash the password
             // const hashedPassword = await bcrypt.hash(password.toString(), 10);
 
-            const teamData = { name, mobilenumber, username, tokenid, Channelid, email, admin_id };
+            const teamData = { name, mobilenumber, username, tokenid, Channelid, email, admin_id, status, password };
 
             const result = await teamService.updateTeam(id, teamData);
 
