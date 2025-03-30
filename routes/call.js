@@ -111,6 +111,7 @@ router.get('/meetings/active', (req, res) => {
 // Join a meeting (team member endpoint)
 router.post('/meetings/join', (req, res) => {
     const { meetingId, userName } = req.body;
+    console.log("req body", req.body)
 
     const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
 
