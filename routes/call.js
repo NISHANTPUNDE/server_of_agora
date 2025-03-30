@@ -199,7 +199,7 @@ router.post('/meetings/join', (req, res) => {
         console.log("Meeting found:", meeting);
 
         // Generate a unique UID for this member
-        const memberUid = result.id;
+        const memberUid = 2000 + result.id;
         console.log("Generated Member UID:", memberUid);
 
         // SQL query to get team and admin details
