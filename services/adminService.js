@@ -3,19 +3,36 @@ const db = require('../config/db'); // Import your MySQL connection
 const AdminService = {
     createAdmin: async (adminData) => {
         return new Promise((resolve, reject) => {
-            const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits } = adminData;
-
-            const sql = `INSERT INTO admin (username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-
-            db.query(sql, [username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits], (err, result) => {
+            console.log("admin data", adminData);
+            const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name } = adminData;
+    
+            // First, check if the username already exists
+            const checkSql = `SELECT username FROM admin WHERE username = ?`;
+    
+            db.query(checkSql, [username], (err, results) => {
                 if (err) {
                     console.error("Database Error:", err);
                     return reject(err);
                 }
-                resolve(result);
+                if (results.length > 0) {
+                    // Username already exists, return an error
+                    return reject({ message: "❌ Username not available. Please use another username." });
+                }
+    
+                // If username doesn't exist, proceed with insertion
+                const insertSql = `INSERT INTO admin (username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name) 
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    
+                db.query(insertSql, [username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name], (err, result) => {
+                    if (err) {
+                        console.error("Database Error:", err);
+                        return reject(err);
+                    }
+                    resolve(result);
+                });
             });
         });
-    },
+    },    
     listAdmins: async (pagesize, offset, search) => {
         return new Promise((resolve, reject) => {
             let sql, queryParams;
@@ -74,11 +91,22 @@ const AdminService = {
     },
     updateAdmin: async (adminId, adminData) => {
         return new Promise((resolve, reject) => {
-            const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits } = adminData;
-
-            const sql = `UPDATE admin SET username = ?, password = ?, email = ?, app_id = ?, app_certificate = ?, channel_name = ?, token_id = ?, adminlimits = ? WHERE id = ?`;
-
-            db.query(sql, [username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits, adminId], (err, result) => {
+            const fields = [];
+            const values = [];
+    
+            Object.entries(adminData).forEach(([key, value]) => {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            });
+    
+            if (fields.length === 0) {
+                return reject(new Error("No fields provided for update."));
+            }
+    
+            values.push(adminId); // Add ID for WHERE condition
+            const sql = `UPDATE admin SET ${fields.join(", ")} WHERE id = ?`;
+    
+            db.query(sql, values, (err, result) => {
                 if (err) {
                     console.error("Database Error:", err);
                     return reject(err);
@@ -87,6 +115,7 @@ const AdminService = {
             });
         });
     },
+    
     loginAdmin: async (username) => {
         return new Promise((resolve, reject) => {
             const sql = `SELECT * FROM admin WHERE username = ?`;
@@ -99,6 +128,7 @@ const AdminService = {
                     return resolve(null);
                 }
                 resolve(results[0]);
+                console.log(results[0]);
             });
         });
     },

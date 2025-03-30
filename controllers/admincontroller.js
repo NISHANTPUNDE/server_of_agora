@@ -8,34 +8,33 @@ const AdminController = {
     createAdmin: async (req, res) => {
         try {
             console.log(req.body);
-            const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits } = req.body;
-
+            const { name, username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits } = req.body;
+    
             if (!username || typeof username !== "string") {
                 return res.status(400).json({ message: "❌ Username is required and must be a string." });
             }
-
-            // if (!email || typeof email !== "string") {
-            //     return res.status(400).json({ message: "❌ Email is required and must be a string." });
-            // }
-
+    
             if (!password || typeof password !== "string") {
                 return res.status(400).json({ message: "❌ Password is required and must be a string." });
             }
-
-            // Hash the password
+    
             const hashedPassword = await bcrypt.hash(password.toString(), 10);
-
-            const adminData = { username, password: hashedPassword, email, app_id, app_certificate, channel_name, token_id, adminlimits };
-
+            const adminData = { username, password: hashedPassword, email, app_id, app_certificate, channel_name, token_id, adminlimits, name };
+    
             // Call service function to create admin
             const result = await AdminService.createAdmin(adminData);
-
+    
             res.json({ message: "✅ Admin created successfully!", adminId: result.insertId });
         } catch (error) {
             console.error("❌ Error creating admin:", error);
+    
+            if (error.message === "❌ Username not available. Please use another username.") {
+                return res.status(400).json({ message: error.message });
+            }
+    
             res.status(500).json({ message: "Internal Server Error" });
         }
-    },
+    },    
     listAdmins: async (req, res) => {
         try {
             const { pagesize, offset, search } = req.query;
@@ -75,31 +74,38 @@ const AdminController = {
     updateAdmin: async (req, res) => {
         try {
             const { id } = req.params;
-            const { username, password, email, app_id, app_certificate, channel_name, token_id, adminlimits } = req.body;
-
-            if (!username || typeof username !== "string") {
-                return res.status(400).json({ message: "❌ Username is required and must be a string." });
+            const adminData = req.body;
+    
+            // If password is present, hash it
+            if (adminData.password) {
+                adminData.password = await bcrypt.hash(adminData.password.toString(), 10);
             }
-
-            if (!password || typeof password !== "string") {
-                return res.status(400).json({ message: "❌ Password is required and must be a string." });
+    
+            // Ensure at least one field is being updated
+            if (Object.keys(adminData).length === 0) {
+                return res.status(400).json({ message: "No fields provided for update." });
             }
-
-            // Hash the password
-            const hashedPassword = await bcrypt.hash(password.toString(), 10);
-
-            const adminData = { username, password: hashedPassword, email, app_id, app_certificate, channel_name, token_id, adminlimits };
-
+    
+            // Include lockstatus update if present in request body
+            if (adminData.lockstatus !== undefined) {
+                adminData.lockstatus = adminData.lockstatus ? 1 : 0; // Convert to boolean integer (1 for locked, 0 for unlocked)
+            }
+    
             // Call service function to update admin
             const result = await AdminService.updateAdmin(id, adminData);
-
-            res.json({ message: "✅ Admin updated successfully!" });
-        }
-        catch (error) {
-            console.error("❌ Error updating admin:", error);
+    
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ message: "Admin not found or no changes made." });
+            }
+    
+            res.json({ message: "Admin updated successfully!" });
+        } catch (error) {
+            console.error("Error updating admin:", error);
             res.status(500).json({ message: "Internal Server Error" });
         }
     },
+    
+    
     loginAdmin: async (req, res) => {
         try {
             const { username, password } = req.body;
@@ -123,7 +129,7 @@ const AdminController = {
             // 🔥 Generate JWT Token
             const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '72h' });
 
-            res.json({ message: '✅ Login successful!', token, id: admin.id, username: admin.username, email: admin.email, app_id: admin.app_id, app_certificate: admin.app_certificate, channel_name: admin.channel_name, token_id: admin.token_id, adminlimits: admin.adminlimits });
+            res.json({ message: '✅ Login successful!', token, id: admin.id, username: admin.username, email: admin.email, app_id: admin.app_id, app_certificate: admin.app_certificate, channel_name: admin.channel_name, token_id: admin.token_id, adminlimits: admin.adminlimits, name: admin.name  });
         } catch (error) {
             console.error("❌ Error logging in admin:", error);
             res.status(500).json({ message: "Internal Server Error" });

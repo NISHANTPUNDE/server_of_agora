@@ -119,7 +119,7 @@ router.post('/meetings/join', (req, res) => {
     }
 
     // Generate a unique UID for this member (greater than 1000 to avoid conflict with admin)
-    const memberUid = 2000 + Math.floor(Math.random() * 1000);
+    const memberUid = userName
 
     // Generate a token for this team member
     const token = generateAgoraToken(meeting.channelName, memberUid);

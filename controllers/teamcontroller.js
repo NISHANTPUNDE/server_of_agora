@@ -5,7 +5,7 @@ const TeamController = {
     createTeam: async (req, res) => {
         try {
             console.log(req.body);
-            const { name, username, password, email, admin_id, mobilenumber } = req.body;
+            const { name, username, password, email, admin_id, mobilenumber, tokenid, Channelid, createdby } = req.body;
 
             if (!name || typeof name !== "string") {
                 return res.status(400).json({ message: "❌ Name is required and must be a string." });
@@ -34,7 +34,7 @@ const TeamController = {
             // Hash the password
             const hashedPassword = await bcrypt.hash(password.toString(), 10);
 
-            const teamData = { name, password: hashedPassword, username, email, admin_id, mobilenumber };
+            const teamData = { name, password: hashedPassword, username, email, admin_id, mobilenumber, tokenid, Channelid, createdby };
 
             // Call service function to create team
             const result = await teamService.createTeam(teamData);
@@ -42,7 +42,7 @@ const TeamController = {
             res.json({ message: "✅ Team created successfully!", teamId: result.insertId });
         } catch (error) {
             console.error("❌ Error creating team:", error);
-            res.status(500).json({ message: "Internal Server Error" });
+            res.status(error.status || 500).json({ message: error.message });
         }
     },
     listTeams: async (req, res) => {
@@ -103,36 +103,13 @@ const TeamController = {
     updateTeam: async (req, res) => {
         try {
             const { id } = req.params;
-            const { name, username, password, email, admin_id, mobilenumber } = req.body;
+            const { name, username,  email, admin_id, mobilenumber , tokenid, Channelid} = req.body;
 
-            if (!name || typeof name !== "string") {
-                return res.status(400).json({ message: "❌ Name is required and must be a string." });
-            }
-
-            if (!username || typeof username !== "string") {
-                return res.status(400).json({ message: "❌ username is required and must be a string." });
-            }
-
-            if (!email || typeof email !== "string") {
-                return res.status(400).json({ message: "❌ Email is required and must be a string." });
-            }
-
-            if (!mobilenumber || typeof mobilenumber !== "string") {
-                return res.status(400).json({ message: "❌ Mobile number is required and must be a string." });
-            }
-
-            if (!password || typeof password !== "string") {
-                return res.status(400).json({ message: "❌ Password is required and must be a string." });
-            }
-
-            if (!admin_id || typeof admin_id !== "number") {
-                return res.status(400).json({ message: "❌ Admin ID is required and must be a number." });
-            }
-
+            console.log("req update",req.body)
             // Hash the password
-            const hashedPassword = await bcrypt.hash(password.toString(), 10);
+            // const hashedPassword = await bcrypt.hash(password.toString(), 10);
 
-            const teamData = { name, password: hashedPassword, username, email, admin_id, mobilenumber };
+            const teamData = { name, mobilenumber, username, tokenid, Channelid, email, admin_id };
 
             const result = await teamService.updateTeam(id, teamData);
 
@@ -150,6 +127,20 @@ const TeamController = {
         try {
             const { id } = req.params;
             const team = await teamService.getTeam(id);
+            if (!team) {
+                return res.status(404).json({ message: "❌ Team not found" });
+            }
+            res.json(team);
+        } catch (error) {
+            console.error("❌ Error getting team:", error);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    },
+
+    getallTeam: async (req, res) => {
+        try {
+            const { createdby } = req.params;
+            const team = await teamService.getTeambyadmin(createdby);
             if (!team) {
                 return res.status(404).json({ message: "❌ Team not found" });
             }

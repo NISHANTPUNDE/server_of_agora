@@ -21,7 +21,7 @@ router.post('/login', (req, res) => {
         }
 
         if (results.length === 0) {
-            return res.status(401).json({ message: '❌ No Super Admin found with this username' });
+            return res.status(401).json({ message: 'Invalid Username Password' });
         }
 
         const storedHash = results[0].password_hash;
