@@ -187,7 +187,7 @@ router.post('/meetings/join', (req, res) => {
             return res.status(404).json({ error: 'Team not found' });
         }
 
-        console.log("Result:", result[0].app_id, result.token_id);
+        console.log("Result:", result[0].app_id, result[0].token_id);
 
         // Find the active meeting by ID
         const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
@@ -199,14 +199,14 @@ router.post('/meetings/join', (req, res) => {
         console.log("Meeting found:", meeting);
 
         // Generate a unique UID for this member
-        const memberUid = 2000 + result.id;
+        const memberUid = 2000 + result[0].id;
         console.log("Generated Member UID:", memberUid);
 
         // SQL query to get team and admin details
 
 
         // Generate a token for the team member
-        const token = generateAgoraToken(meeting.channelName, memberUid, result.app_id, result.token_id);
+        const token = generateAgoraToken(meeting.channelName, memberUid, result[0].app_id, result[0].token_id);
 
         // Add team member to the meeting
         meeting.teamMembers.push({
