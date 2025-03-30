@@ -120,6 +120,8 @@ router.post('/meetings/create', async (req, res) => {
 // Update meeting status (admin endpoint)
 router.post('/meetings/update', (req, res) => {
     const { isActive, channelName } = req.body;
+    console.log(isActive, channelName)
+
 
     const meetingIndex = activeMeetings.findIndex(m => m.channelName === channelName);
 
