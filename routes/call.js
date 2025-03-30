@@ -187,7 +187,7 @@ router.post('/meetings/join', (req, res) => {
             return res.status(404).json({ error: 'Team not found' });
         }
 
-        console.log("Result:", result);
+        console.log("Result:", result.app_id, result.token_id);
 
         // Find the active meeting by ID
         const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
@@ -199,7 +199,7 @@ router.post('/meetings/join', (req, res) => {
         console.log("Meeting found:", meeting);
 
         // Generate a unique UID for this member
-        const memberUid = 2000 + Math.floor(Math.random() * 1000);
+        const memberUid = result.id;
         console.log("Generated Member UID:", memberUid);
 
         // SQL query to get team and admin details
