@@ -187,7 +187,7 @@ router.post('/meetings/join', (req, res) => {
             return res.status(404).json({ error: 'Team not found' });
         }
 
-        console.log("Result:", result.app_id, result.token_id);
+        console.log("Result:", result[0].app_id, result.token_id);
 
         // Find the active meeting by ID
         const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
