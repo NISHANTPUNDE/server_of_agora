@@ -2,6 +2,8 @@ const express = require('express');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const AdminService = require('../services/adminService');
 const router = express.Router();
+const db = require('../config/db');
+
 
 // Your Agora App credentials
 // const APP_ID = "e9d4b556259a45f18121742537c185ad";
@@ -157,60 +159,92 @@ router.get('/meetings/active', (req, res) => {
 });
 
 // Join a meeting (team member endpoint)
+
+
+
 router.post('/meetings/join', (req, res) => {
-    const { meetingId, userName } = req.body;
-    console.log("req body", req.body)
+    const { meetingId, userName, teamid } = req.body;
 
-    const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
+    console.log("Received Request:", req.body);
+    const sql = `SELECT  admin.*
+    FROM team   
+    JOIN admin ON team.admin_id = admin.id
+    WHERE team.id = ?`;
 
-    if (!meeting) {
-        return res.status(404).json({ error: 'Meeting not found or no longer active' });
-    }
+    console.log("Executing SQL Query...");
 
-    // Generate a unique UID for this member (greater than 1000 to avoid conflict with admin)
-    const memberUid = 2000 + Math.floor(Math.random() * 1000);
-
-    // Generate a token for this team member
-    const token = generateAgoraToken(meeting.channelName, memberUid);
-
-    // Add team member to the meeting
-    meeting.teamMembers.push({
-        uid: memberUid,
-        name: userName,
-        joinTime: new Date()
-    });
-
-    res.status(200).json({
-        meeting: {
-            ...meeting,
-            token: token,  // Send the team member-specific token
-            uid: memberUid,  // Send the member's UID
-            permissionInfo: {
-                required: ['camera', 'microphone'],
-                instructions: 'Please allow access to your camera and microphone when prompted by the browser.'
-            }
+    // Execute the query
+    db.query(sql, [teamid], (err, result) => {
+        if (err) {
+            console.error("Database Error:", err);
+            return res.status(500).json({ error: 'Database error' });
         }
+
+        console.log("SQL Query Executed. Result length:", result.length);
+
+        if (result.length === 0) {
+            console.log("Team not found");
+            return res.status(404).json({ error: 'Team not found' });
+        }
+
+        console.log("Result:", result);
+
+        // Find the active meeting by ID
+        const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
+        if (!meeting) {
+            console.log("Meeting not found or no longer active.");
+            return res.status(404).json({ error: 'Meeting not found or no longer active' });
+        }
+
+        console.log("Meeting found:", meeting);
+
+        // Generate a unique UID for this member
+        const memberUid = 2000 + Math.floor(Math.random() * 1000);
+        console.log("Generated Member UID:", memberUid);
+
+        // SQL query to get team and admin details
+
+
+        // Generate a token for the team member
+        const token = generateAgoraToken(meeting.channelName, memberUid, result.app_id, result.token_id);
+
+        // Add team member to the meeting
+        meeting.teamMembers.push({
+            uid: memberUid,
+            name: userName,
+            joinTime: new Date()
+        });
+
+        console.log("Team member added to meeting:", userName);
+
+        // Send response with meeting details and generated token
+        res.status(200).json({
+            meeting: {
+                ...meeting,
+                token: token,
+                uid: memberUid,
+                permissionInfo: {
+                    required: ['camera', 'microphone'],
+                    instructions: 'Please allow access to your camera and microphone when prompted by the browser.'
+                }
+            }
+        });
     });
 });
+
+
 
 // Simple token-only endpoint (for testing)
-router.get('/token', (req, res) => {
-    const channelName = req.query.channel || 'test';
-    const uid = parseInt(req.query.uid) || 0;
+// router.get('/token', (req, res) => {
+//     const channelName = req.query.channel || 'test';
+//     const uid = parseInt(req.query.uid) || 0;
 
-    const token = generateAgoraToken(channelName, uid);
+//     const token = generateAgoraToken(channelName, uid);
 
-    res.json({ token });
-});
+//     res.json({ token });
+// });
 
-router.get('/connectiontoagora', (req, res) => {
-    const appId = "e9d4b556259a45f18121742537c185ad";
 
-    const token = "006e9d4b556259a45f18121742537c185adIABEKyfGO0N91Y0Nt6qt4X3hEib8tZ6mVTKhc9JGYSvu4Ax+f9gAAAAAIgARfE/55hjoZwQAAQB21eZnAgB21eZnAwB21eZnBAB21eZn";
-    const channel = "testing";
-    res.send({ appId, token, channel });
-}
-);
 
 
 
