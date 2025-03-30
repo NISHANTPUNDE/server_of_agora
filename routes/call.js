@@ -1,16 +1,17 @@
 const express = require('express');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
+const AdminService = require('../services/adminService');
 const router = express.Router();
 
 // Your Agora App credentials
-const APP_ID = "e9d4b556259a45f18121742537c185ad";
-const APP_CERTIFICATE = "4c515d8f0bca49199db5b6b21992dfca";
+// const APP_ID = "e9d4b556259a45f18121742537c185ad";
+// const APP_CERTIFICATE = "4c515d8f0bca49199db5b6b21992dfca";
 
 // In-memory storage for active meetings
 let activeMeetings = [];
 
 // Generate a proper Agora token
-function generateAgoraToken(channelName, uid) {
+function generateAgoraToken(channelName, uid, APP_ID, APP_CERTIFICATE) {
     // Set token expiration time (in seconds)
     const expirationTimeInSeconds = 3600; // 1 hour
 
@@ -19,6 +20,12 @@ function generateAgoraToken(channelName, uid) {
 
     // Calculate privilege expire time
     const privilegeExpireTime = currentTimestamp + expirationTimeInSeconds;
+
+    console.log("APP_ID", APP_ID)
+    console.log("APP_CERTIFICATE", APP_CERTIFICATE)
+    console.log("channelName", channelName)
+    console.log("uid", uid)
+    console.log("privilegeExpireTime", privilegeExpireTime)
 
     // Build the token with RTC role as publisher
     return RtcTokenBuilder.buildTokenWithUid(
@@ -63,8 +70,14 @@ router.get('/meetings/user-info/:channelName/:uid', (req, res) => {
 });
 
 // Create a new meeting (admin endpoint)
-router.post('/meetings/create', (req, res) => {
-    const { meetingName, adminName } = req.body;
+router.post('/meetings/create', async (req, res) => {
+    const { meetingName, adminName, id } = req.body;
+
+    const result = await AdminService.getAdmin(id);
+    console.log("result", result)
+
+
+    console.log("result", result)
 
     if (!meetingName || !adminName) {
         return res.status(400).json({ error: 'Meeting name and admin name are required' });
@@ -76,9 +89,13 @@ router.post('/meetings/create', (req, res) => {
         isActive: false
     }));
 
-    const channelName = `testing`;
+    const channelName = result.channel_name;
     const adminUid = 1000; // Use a fixed UID for admin (e.g., 1000)
-    const token = generateAgoraToken(channelName, adminUid);
+    const APP_ID = result.app_id;
+    console.log("APP_ID", result.app_id)
+    const APP_CERTIFICATE = result.token_id;
+    const token = generateAgoraToken(channelName, adminUid, APP_ID, APP_CERTIFICATE);
+
 
     const newMeeting = {
         id: Date.now(),
