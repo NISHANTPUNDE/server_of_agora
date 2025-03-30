@@ -31,6 +31,37 @@ function generateAgoraToken(channelName, uid) {
     );
 }
 
+router.get('/meetings/user-info/:channelName/:uid', (req, res) => {
+    const { channelName, uid } = req.params;
+
+    // Find the meeting by channel name
+    const meeting = activeMeetings.find(m => m.channelName === channelName && m.isActive);
+
+    if (!meeting) {
+        return res.status(404).json({ error: 'Meeting not found or no longer active' });
+    }
+
+    // Check if the user is the admin
+    if (meeting.adminUid === parseInt(uid)) {
+        return res.status(200).json({
+            userName: meeting.adminName,
+            isAdmin: true
+        });
+    }
+
+    // Check if the user is a team member
+    const teamMember = meeting.teamMembers.find(m => m.uid === parseInt(uid));
+    if (teamMember) {
+        return res.status(200).json({
+            userName: teamMember.name,
+            isAdmin: false
+        });
+    }
+
+    // User not found
+    return res.status(404).json({ error: 'User not found in meeting' });
+});
+
 // Create a new meeting (admin endpoint)
 router.post('/meetings/create', (req, res) => {
     const { meetingName, adminName } = req.body;
