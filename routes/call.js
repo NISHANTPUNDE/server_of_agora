@@ -155,7 +155,33 @@ router.post('/meetings/mute-member', (req, res) => {
 
 // Get all active meetings (team member endpoint)
 router.get('/meetings/active', (req, res) => {
-    res.status(200).json(activeMeetings);
+    const { teamid } = req.query;
+    console.log("Received Request:", req.query);
+    // Query to get admin information for the team
+    const sql = `SELECT admin.name 
+                 FROM team 
+                 JOIN admin ON team.admin_id = admin.id 
+                 WHERE team.id = ?`;
+
+    db.query(sql, [teamid], (err, result) => {
+        if (err) {
+            console.error("Database Error:", err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'Team not found' });
+        }
+        console.log(result[0].name)
+        console.log("activeMeetings", activeMeetings)
+
+        // Filter active meetings where admin name matches
+        const filteredMeetings = activeMeetings.filter(meeting =>
+            meeting.adminName === result[0].name
+        );
+
+        res.status(200).json(filteredMeetings);
+    });
 });
 
 // Join a meeting (team member endpoint)
