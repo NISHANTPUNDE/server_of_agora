@@ -6,6 +6,10 @@ const team = require('./routes/team');
 const call = require('./routes/call');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+const recordings = require('./routes/recordings');
 
 
 const app = express();
@@ -73,6 +77,29 @@ app.use('/v1/superadmin', superadmin);
 app.use('/v1/admin', admin);
 app.use('/v1/call', call);
 app.use('/v1/team', team);
+
+// Configure multer for file storage
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        console.log("req.params", req.query)
+        const adminId = req.query.adminId || 'default';
+        const dir = `./recordings/${adminId}`;
+
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Create recordings route
+app.use('/v1/add/recordings', upload.single('recording'), recordings);
 
 // app.use('/v1/user', user);
 

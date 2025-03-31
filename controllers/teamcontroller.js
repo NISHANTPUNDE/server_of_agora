@@ -74,24 +74,34 @@ const TeamController = {
             }
 
             const team = await teamService.loginTeam(username);
+
+            if (team.status === 0) {
+                return res.status(401).json({ message: '❌ Your account is Deactive' });
+            }
+
             if (!team) {
                 return res.status(401).json({ message: '❌ No Team found with this username' });
             }
 
-            const storedHash = team.password;
+            // const storedHash = team.password;
 
-            bcrypt.compare(password, storedHash, (err, isMatch) => {
-                if (err) {
-                    console.error('❌ Bcrypt error:', err);
-                    return res.status(500).json({ message: 'Internal server error' });
-                }
+            // bcrypt.compare(password, storedHash, (err, isMatch) => {
+            //     if (err) {
+            //         console.error('❌ Bcrypt error:', err);
+            //         return res.status(500).json({ message: 'Internal server error' });
+            //     }
 
-                if (!isMatch) {
-                    return res.status(401).json({ message: '❌ Incorrect password' });
-                }
+            //     if (!isMatch) {
+            //         return res.status(401).json({ message: '❌ Incorrect password' });
+            //     }
+            const isMatch = password === team.password; // Compare the plain password with the hashed password
 
-                res.json({ message: '✅ Login successful!', user: team });
-            });
+            if (!isMatch) {
+                return res.status(401).json({ message: '❌ Incorrect password' });
+            }
+
+            res.json({ message: '✅ Login successful!', user: team });
+
         } catch (error) {
             console.error('❌ Error during login:', error);
             res.status(500).json({ message: 'Internal server error' });

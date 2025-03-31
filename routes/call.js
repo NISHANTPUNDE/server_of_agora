@@ -60,6 +60,7 @@ router.get('/meetings/user-info/:channelName/:uid', (req, res) => {
 
     // Check if the user is a team member
     const teamMember = meeting.teamMembers.find(m => m.uid === parseInt(uid));
+    console.log("teamMember", teamMember)
     if (teamMember) {
         return res.status(200).json({
             userName: teamMember.name,
@@ -113,6 +114,7 @@ router.post('/meetings/create', async (req, res) => {
     };
 
     activeMeetings.push(newMeeting);
+    console.log("Active Meetings:", activeMeetings);
 
     res.status(201).json(newMeeting);
 });
@@ -193,6 +195,7 @@ router.get('/meetings/active', (req, res) => {
 router.post('/meetings/join', (req, res) => {
     const { meetingId, userName, teamid } = req.body;
 
+
     console.log("Received Request:", req.body);
     const sql = `SELECT  admin.*
     FROM team   
@@ -219,6 +222,8 @@ router.post('/meetings/join', (req, res) => {
 
         // Find the active meeting by ID
         const meeting = activeMeetings.find(m => m.id === parseInt(meetingId) && m.isActive);
+        console.log("Meeting ID:", meetingId);
+        console.log("Meeting:", activeMeetings);
         if (!meeting) {
             console.log("Meeting not found or no longer active.");
             return res.status(404).json({ error: 'Meeting not found or no longer active' });

@@ -18,8 +18,8 @@ const AdminController = {
                 return res.status(400).json({ message: "❌ Password is required and must be a string." });
             }
 
-            const hashedPassword = await bcrypt.hash(password.toString(), 10);
-            const adminData = { username, password: hashedPassword, email, app_id, app_certificate, channel_name, token_id, adminlimits, name };
+            // const hashedPassword = await bcrypt.hash(password.toString(), 10);
+            const adminData = { username, password: password, email, app_id, app_certificate, channel_name, token_id, adminlimits, name };
 
             // Call service function to create admin
             const result = await AdminService.createAdmin(adminData);
@@ -122,7 +122,14 @@ const AdminController = {
                 return res.status(401).json({ message: '❌ No Admin found with this username' });
             }
 
-            const isMatch = await bcrypt.compare(password, admin.password);
+            if (admin.lcokstatus === 0) {
+                return res.status(401).json({ message: '❌ Your account is Deactive' });
+            }
+            console.log(password, admin.password)
+
+            const isMatch = password === admin.password;
+
+            // const isMatch = await bcrypt.compare(password, admin.password);
 
             if (!isMatch) {
                 return res.status(401).json({ message: '❌ Incorrect password' });

@@ -48,6 +48,29 @@ const TeamService = {
                 // Hash the password before storing
                 // const hashedPassword = await bcrypt.hash(password, 10);
 
+
+                const checkAdminLimitsSql = `SELECT COUNT(*) as teamCount, adminlimits 
+                    FROM team t 
+                    JOIN admin a ON t.admin_id = a.id 
+                    WHERE t.admin_id = ?
+                    GROUP BY a.adminlimits`;
+
+                const adminCheckResult = await new Promise((resolve, reject) => {
+                    db.query(checkAdminLimitsSql, [admin_id], (err, results) => {
+                        if (err) reject(err);
+                        resolve(results);
+                    });
+                });
+
+
+                if (adminCheckResult.length > 0) {
+                    const { teamCount, adminlimits } = adminCheckResult[0];
+                    if (teamCount >= adminlimits) {
+                        throw new Error("Admin has reached maximum team member limit");
+                    }
+                }
+
+
                 // SQL query
                 const sql = `INSERT INTO team 
                 (admin_id, username, password, status, name, mobilenumber, email, tokenid, Channelid, createdby) 
