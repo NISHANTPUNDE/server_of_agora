@@ -293,6 +293,11 @@ router.post('/meetings/kick-participant', (req, res) => {
 
     // Remove the participant from the meeting
     const removedParticipant = meeting.teamMembers.splice(participantIndex, 1)[0];
+    const participantSocketId = userSockets[participantUid];
+    if (participantSocketId) {
+        io.to(participantSocketId).emit('user-kicked', { channelName });
+    }
+
 
     console.log(`Participant ${removedParticipant.name} (UID: ${removedParticipant.uid}) kicked from meeting ${meeting.name}`);
 
