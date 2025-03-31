@@ -79,9 +79,9 @@ const AdminController = {
             console.log("req body ok", req.body)
 
             // If password is present, hash it
-            if (adminData.password) {
-                adminData.password = await bcrypt.hash(adminData.password.toString(), 10);
-            }
+            // if (adminData.password) {
+            //     // adminData.password = await bcrypt.hash(adminData.password.toString(), 10);
+            // }
 
             // Ensure at least one field is being updated
             if (Object.keys(adminData).length === 0) {
