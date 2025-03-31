@@ -9,6 +9,7 @@ const { Server } = require('socket.io');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const db = require('./config/db'); // Assuming you have a db.js file for database connection
 const recordings = require('./routes/recordings');
 
 
@@ -84,15 +85,35 @@ app.use('/v1/team', team);
 // Configure multer for file storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        console.log("req.params", req.query)
-        const adminId = req.query.adminId || 'default';
-        const dir = `./recordings/${adminId}`;
+        const teamId = req.query.teamid || 'default';
+        const sql = `SELECT admin.id 
+                 FROM team 
+                 JOIN admin ON team.admin_id = admin.id 
+                 WHERE team.id = ?`;
 
-        // Create directory if it doesn't exist
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        cb(null, dir);
+        db.query(sql, [teamId], (err, result) => {
+            if (err) {
+                console.error("Database Error:", err);
+                cb(new Error('Database error'));
+                return;
+            }
+
+            if (result.length === 0) {
+                cb(new Error('Team not found'));
+                return;
+            }
+
+            const adminId = result[0].id;
+            console.log("Admin ID:", adminId); // Log the admin ID for debugging
+            console.log("Team ID:", teamId); // Log the team ID for debugging
+            const dir = `./recordings/${adminId}/${teamId}`; // Nested folder structure
+
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            cb(null, dir);
+        });
     },
     filename: function (req, file, cb) {
         cb(null, file.originalname);

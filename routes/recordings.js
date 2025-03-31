@@ -11,7 +11,7 @@ router.post('/', async (req, res) => {
             filename: req.file.filename,
             path: req.file.path,
             size: req.file.size,
-            adminId: req.params.adminId || 'default'
+            teamId: req.params.teamid || 'default'
         };
 
         res.status(200).json({
@@ -26,7 +26,7 @@ router.post('/', async (req, res) => {
 
 router.get('/:adminId', (req, res) => {
     const adminId = req.params.adminId;
-    const dir = `./recordings/${adminId}`;
+    const dir = `./recordings/${teamId}/${adminId}`; // Adjust the path as needed
 
     try {
         if (!fs.existsSync(dir)) {

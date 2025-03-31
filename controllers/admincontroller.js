@@ -128,6 +128,9 @@ const AdminController = {
             console.log(password, admin.password)
 
             const isMatch = password === admin.password;
+            console.log("password", password)
+            console.log("admin password", admin.password)
+            console.log(isMatch)
 
             // const isMatch = await bcrypt.compare(password, admin.password);
 
