@@ -266,6 +266,51 @@ router.post('/meetings/join', (req, res) => {
 });
 
 
+// Kick a participant from the meeting (admin endpoint)
+router.post('/meetings/kick-participant', (req, res) => {
+    const { channelName, participantUid, adminUid } = req.body;
+
+    console.log(`Admin ${adminUid} requested to kick participant ${participantUid} from channel ${channelName}`);
+
+    // Find the meeting
+    const meeting = activeMeetings.find(m => m.channelName === channelName && m.isActive);
+
+    if (!meeting) {
+        return res.status(404).json({ error: 'Meeting not found or no longer active' });
+    }
+
+    // Verify that the request is from the admin
+    if (meeting.adminUid !== parseInt(adminUid)) {
+        return res.status(403).json({ error: 'Only the meeting admin can kick participants' });
+    }
+
+    // Check if the participant exists in the meeting
+    const participantIndex = meeting.teamMembers.findIndex(member => member.uid === parseInt(participantUid));
+
+    if (participantIndex === -1) {
+        return res.status(404).json({ error: 'Participant not found in the meeting' });
+    }
+
+    // Remove the participant from the meeting
+    const removedParticipant = meeting.teamMembers.splice(participantIndex, 1)[0];
+
+    console.log(`Participant ${removedParticipant.name} (UID: ${removedParticipant.uid}) kicked from meeting ${meeting.name}`);
+
+    // In a real implementation, you might want to:
+    // 1. Notify the participant that they've been kicked
+    // 2. Update any other systems or databases
+    // 3. Log the action for auditing purposes
+
+    res.status(200).json({
+        success: true,
+        message: `${removedParticipant.name} has been removed from the meeting`,
+        removedParticipant: {
+            uid: removedParticipant.uid,
+            name: removedParticipant.name
+        }
+    });
+});
+
 
 // Simple token-only endpoint (for testing)
 // router.get('/token', (req, res) => {
