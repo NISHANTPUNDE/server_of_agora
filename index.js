@@ -26,6 +26,7 @@ const io = new Server(httpServer, {
 // Socket connections by user ID
 const userSockets = {};
 
+
 // Set up Socket.IO
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);

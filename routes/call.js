@@ -3,7 +3,7 @@ const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const AdminService = require('../services/adminService');
 const router = express.Router();
 const db = require('../config/db');
-
+const { userSockets, io } = require('../index');
 
 // Your Agora App credentials
 // const APP_ID = "e9d4b556259a45f18121742537c185ad";
@@ -326,9 +326,5 @@ router.post('/meetings/kick-participant', (req, res) => {
 
 //     res.json({ token });
 // });
-
-
-
-
 
 module.exports = router;
