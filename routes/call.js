@@ -3,7 +3,7 @@ const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const AdminService = require('../services/adminService');
 const router = express.Router();
 const db = require('../config/db');
-const { userSockets, io } = require('../index');
+
 
 // Your Agora App credentials
 // const APP_ID = "e9d4b556259a45f18121742537c185ad";
@@ -285,8 +285,7 @@ router.post('/meetings/kick-participant', (req, res) => {
     }
 
     // Check if the participant exists in the meeting
-    const parsedParticipantUid = parseInt(participantUid?.toString().trim());
-    const participantIndex = meeting.teamMembers.findIndex(member => member.uid === parsedParticipantUid);
+    const participantIndex = meeting.teamMembers.findIndex(member => member.uid === parseInt(participantUid));
 
     if (participantIndex === -1) {
         return res.status(404).json({ error: 'Participant not found in the meeting' });
@@ -294,12 +293,13 @@ router.post('/meetings/kick-participant', (req, res) => {
 
     // Remove the participant from the meeting
     const removedParticipant = meeting.teamMembers.splice(participantIndex, 1)[0];
-    const participantSocketId = userSockets[parsedParticipantUid];
-    if (participantSocketId) {
-        io.to(participantSocketId).emit('user-kicked', { channelName });
-    }
 
     console.log(`Participant ${removedParticipant.name} (UID: ${removedParticipant.uid}) kicked from meeting ${meeting.name}`);
+
+    // In a real implementation, you might want to:
+    // 1. Notify the participant that they've been kicked
+    // 2. Update any other systems or databases
+    // 3. Log the action for auditing purposes
 
     res.status(200).json({
         success: true,
@@ -312,7 +312,6 @@ router.post('/meetings/kick-participant', (req, res) => {
 });
 
 
-
 // Simple token-only endpoint (for testing)
 // router.get('/token', (req, res) => {
 //     const channelName = req.query.channel || 'test';
@@ -322,5 +321,9 @@ router.post('/meetings/kick-participant', (req, res) => {
 
 //     res.json({ token });
 // });
+
+
+
+
 
 module.exports = router;
