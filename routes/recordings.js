@@ -24,7 +24,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.get('/:adminId', (req, res) => {
+router.get('/:teamid', (req, res) => {
     const adminId = req.params.adminId;
     const dir = `./recordings/${teamId}/${adminId}`; // Adjust the path as needed
 

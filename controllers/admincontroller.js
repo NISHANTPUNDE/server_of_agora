@@ -123,7 +123,7 @@ const AdminController = {
             }
 
             if (admin.lcokstatus === 0) {
-                return res.status(401).json({ message: '❌ Your account is Deactive' });
+                return res.status(401).json({ message: '❌ Your account is Deactive Contact SuperAdmin' });
             }
             console.log(password, admin.password)
 

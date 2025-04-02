@@ -2,12 +2,8 @@ const express = require('express');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const AdminService = require('../services/adminService');
 const router = express.Router();
+const axios = require('axios');
 const db = require('../config/db');
-
-
-// Your Agora App credentials
-// const APP_ID = "e9d4b556259a45f18121742537c185ad";
-// const APP_CERTIFICATE = "4c515d8f0bca49199db5b6b21992dfca";
 
 // In-memory storage for active meetings
 let activeMeetings = [];
@@ -15,19 +11,13 @@ let activeMeetings = [];
 // Generate a proper Agora token
 function generateAgoraToken(channelName, uid, APP_ID, APP_CERTIFICATE) {
     // Set token expiration time (in seconds)
-    const expirationTimeInSeconds = 3600; // 1 hour
+    const expirationTimeInSeconds = 7200; // 2 hour
 
     // Get current timestamp (in seconds)
     const currentTimestamp = Math.floor(Date.now() / 1000);
 
     // Calculate privilege expire time
     const privilegeExpireTime = currentTimestamp + expirationTimeInSeconds;
-
-    console.log("APP_ID", APP_ID)
-    console.log("APP_CERTIFICATE", APP_CERTIFICATE)
-    console.log("channelName", channelName)
-    console.log("uid", uid)
-    console.log("privilegeExpireTime", privilegeExpireTime)
 
     // Build the token with RTC role as publisher
     return RtcTokenBuilder.buildTokenWithUid(
@@ -40,37 +30,46 @@ function generateAgoraToken(channelName, uid, APP_ID, APP_CERTIFICATE) {
     );
 }
 
-router.get('/meetings/user-info/:channelName/:uid', (req, res) => {
+router.get('/meetings/check-participant-status/:channelName/:uid', (req, res) => {
     const { channelName, uid } = req.params;
 
     // Find the meeting by channel name
     const meeting = activeMeetings.find(m => m.channelName === channelName && m.isActive);
 
     if (!meeting) {
-        return res.status(404).json({ error: 'Meeting not found or no longer active' });
+        // Meeting not found or no longer active
+        return res.status(404).json({
+            error: 'Meeting not found or no longer active',
+            kicked: true
+        });
     }
 
-    // Check if the user is the admin
+    // Check if this is the admin
     if (meeting.adminUid === parseInt(uid)) {
+        // Admin is always in the meeting
         return res.status(200).json({
-            userName: meeting.adminName,
+            kicked: false,
             isAdmin: true
         });
     }
 
-    // Check if the user is a team member
-    const teamMember = meeting.teamMembers.find(m => m.uid === parseInt(uid));
-    console.log("teamMember", teamMember)
-    if (teamMember) {
-        return res.status(200).json({
-            userName: teamMember.name,
-            isAdmin: false
+    // Check if the participant is in the teamMembers array
+    const participant = meeting.teamMembers.find(m => m.uid === parseInt(uid));
+
+    if (!participant) {
+        // Participant not found in the meeting, they've been kicked
+        return res.status(404).json({
+            error: 'Participant not found in meeting',
+            kicked: true
         });
     }
 
-    // User not found
-    return res.status(404).json({ error: 'User not found in meeting' });
-});
+    // Participant is still in the meeting
+    return res.status(200).json({
+        kicked: false,
+        name: participant.name
+    });
+})
 
 // Create a new meeting (admin endpoint)
 router.post('/meetings/create', async (req, res) => {
@@ -95,7 +94,6 @@ router.post('/meetings/create', async (req, res) => {
     const channelName = result.channel_name;
     const adminUid = 1000; // Use a fixed UID for admin (e.g., 1000)
     const APP_ID = result.app_id;
-    console.log("APP_ID", result.app_id)
     const APP_CERTIFICATE = result.token_id;
     const token = generateAgoraToken(channelName, adminUid, APP_ID, APP_CERTIFICATE);
 
@@ -114,16 +112,12 @@ router.post('/meetings/create', async (req, res) => {
     };
 
     activeMeetings.push(newMeeting);
-    console.log("Active Meetings:", activeMeetings);
-
     res.status(201).json(newMeeting);
 });
 
 // Update meeting status (admin endpoint)
 router.post('/meetings/update', (req, res) => {
     const { isActive, channelName } = req.body;
-    console.log(isActive, channelName)
-
 
     const meetingIndex = activeMeetings.findIndex(m => m.channelName === channelName);
 
@@ -194,8 +188,6 @@ router.get('/meetings/active', (req, res) => {
 
 router.post('/meetings/join', (req, res) => {
     const { meetingId, userName, teamid } = req.body;
-
-
     console.log("Received Request:", req.body);
     const sql = `SELECT  admin.*
     FROM team   
@@ -266,40 +258,72 @@ router.post('/meetings/join', (req, res) => {
 });
 
 
-// Kick a participant from the meeting (admin endpoint)
-router.post('/meetings/kick-participant', (req, res) => {
-    const { channelName, participantUid, adminUid } = req.body;
+// Add this function to your server file to maintain a blacklist of kicked users
 
+// Store kicked users with timestamps to eventually expire them
+let kickedUsers = [];
+
+
+router.post('/meetings/kick-participant', async (req, res) => {
+    const { channelName, participantUid, adminUid, app_certificateis } = req.body;
     console.log(`Admin ${adminUid} requested to kick participant ${participantUid} from channel ${channelName}`);
 
-    // Find the meeting
     const meeting = activeMeetings.find(m => m.channelName === channelName && m.isActive);
-
     if (!meeting) {
         return res.status(404).json({ error: 'Meeting not found or no longer active' });
     }
 
-    // Verify that the request is from the admin
     if (meeting.adminUid !== parseInt(adminUid)) {
         return res.status(403).json({ error: 'Only the meeting admin can kick participants' });
     }
 
-    // Check if the participant exists in the meeting
     const participantIndex = meeting.teamMembers.findIndex(member => member.uid === parseInt(participantUid));
-
     if (participantIndex === -1) {
         return res.status(404).json({ error: 'Participant not found in the meeting' });
     }
 
-    // Remove the participant from the meeting
     const removedParticipant = meeting.teamMembers.splice(participantIndex, 1)[0];
+    kickedUsers.push({
+        channelName,
+        uid: parseInt(participantUid),
+        kickedAt: Date.now(),
+        expiresAt: Date.now() + (60 * 60 * 1000), // 1 hour expiration
+        name: removedParticipant.name
+    });
 
     console.log(`Participant ${removedParticipant.name} (UID: ${removedParticipant.uid}) kicked from meeting ${meeting.name}`);
 
-    // In a real implementation, you might want to:
-    // 1. Notify the participant that they've been kicked
-    // 2. Update any other systems or databases
-    // 3. Log the action for auditing purposes
+    // --- Force disconnect using Agora RESTful API ---
+    try {
+        // The values need to be strings, not bare identifiers
+        const customerId = "b3d237e6c0be4e39b939f06f167c03cd";
+        const customerSecret = "faf96daa1a654a599c5e685e13ec3d9c";
+
+        // Create the Basic Auth credentials
+        const authString = Buffer.from(`${customerId}:${customerSecret}`).toString('base64');
+
+        // Call Agora's kicking-rule endpoint with Basic Auth
+        await axios.post(
+            'https://api.agora.io/dev/v1/kicking-rule',
+            {
+                appid: meeting.APP_ID,
+                cname: channelName,
+                uid: parseInt(participantUid),
+                time: 60 // Ban duration in seconds; adjust as needed
+            },
+            {
+                headers: {
+                    'Authorization': `Basic ${authString}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        console.log(`Force-disconnected user ${participantUid} from Agora channel ${channelName}`);
+    } catch (error) {
+        console.error("Error force-disconnecting user from Agora:", error.response?.data || error.message);
+        // Still return success since we've removed them from our local tracking
+    }
+    // --- End force disconnect ---
 
     res.status(200).json({
         success: true,
@@ -310,19 +334,6 @@ router.post('/meetings/kick-participant', (req, res) => {
         }
     });
 });
-
-
-// Simple token-only endpoint (for testing)
-// router.get('/token', (req, res) => {
-//     const channelName = req.query.channel || 'test';
-//     const uid = parseInt(req.query.uid) || 0;
-
-//     const token = generateAgoraToken(channelName, uid);
-
-//     res.json({ token });
-// });
-
-
 
 
 
