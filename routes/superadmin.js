@@ -130,10 +130,15 @@ router.get('/getprice', (req, res) => {
 router.post('/savehistory', async (req, res) => {
     try {
         const { name, date, calltime, userid } = req.body;
+        console.log("req.body", req.body)
 
         // Validate input
-        if (!name || !date || !calltime || !userid) {
+        if (!name || !date || calltime === undefined || !userid) {
             return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        if (calltime === 0) {
+            return res.status(400).json({ message: 'Call time cannot be zero' });
         }
 
         if (isNaN(calltime)) {
