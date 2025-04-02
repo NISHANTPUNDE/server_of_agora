@@ -24,7 +24,7 @@ const AdminController = {
             // Call service function to create admin
             const result = await AdminService.createAdmin(adminData);
 
-            res.json({ message: "✅ Admin created successfully!", adminId: result.insertId });
+            res.json({ message: "✅ Admin created successfully!", adminId: result });
         } catch (error) {
             console.error("❌ Error creating admin:", error);
 

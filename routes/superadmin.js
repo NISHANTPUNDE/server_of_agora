@@ -68,5 +68,170 @@ router.post('/register', async (req, res) => {
     }
 });
 
+router.post('/saveprice', async (req, res) => {
+    try {
+        const { price } = req.body;
+
+        if (!price) {
+            return res.status(400).json({ message: 'price required' });
+        }
+
+        const checkQuery = 'SELECT id FROM price WHERE id = 1';
+        db.query(checkQuery, (err, result) => {
+            if (err) {
+                console.error('❌ Error checking price:', err);
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+
+            if (result.length === 0) {
+                // Insert if ID 1 is not present
+                const insertQuery = 'INSERT INTO price (id, price) VALUES (1, ?)';
+                db.query(insertQuery, [price], (err) => {
+                    if (err) {
+                        console.error('❌ Error inserting price:', err);
+                        return res.status(500).json({ message: 'Internal server error' });
+                    }
+                    res.json({ message: '✅ Price added successfully!' });
+                });
+            } else {
+                // Update if ID 1 is present
+                const updateQuery = 'UPDATE price SET price = ? WHERE id = 1';
+                db.query(updateQuery, [price], (err) => {
+                    if (err) {
+                        console.error('❌ Error updating price:', err);
+                        return res.status(500).json({ message: 'Internal server error' });
+                    }
+                    res.json({ message: '✅ Price updated successfully!' });
+                });
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error during price add/update:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+router.get('/getprice', (req, res) => {
+    try {
+        const sql = 'SELECT * FROM price';
+        db.query(sql, (err, result) => {
+            if (err) {
+                console.error('❌ Error during Save price:', err);
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+            res.json({ Price: result })
+        })
+    } catch (error) {
+        console.log("error", error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+})
+
+router.post('/savehistory', async (req, res) => {
+    try {
+        const { name, date, calltime, userid } = req.body;
+
+        // Validate input
+        if (!name || !date || !calltime || !userid) {
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        if (isNaN(calltime)) {
+            return res.status(400).json({ message: 'Invalid call time' });
+        }
+
+        // Fetch price from database
+        const sqlPrice = 'SELECT price FROM price';
+        db.query(sqlPrice, (err, priceResult) => {
+            if (err) {
+                console.error('❌ Error fetching price:', err);
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+            console.log("priceResult", priceResult)
+            if (!priceResult.length || isNaN(priceResult[0].price)) {
+                return res.status(400).json({ message: 'Invalid price data' });
+            }
+
+            const pricePer1000Min = parseFloat(priceResult[0].price);
+
+
+            // Calculate cost
+            const cost = ((parseFloat(calltime) / 1000) * pricePer1000Min).toFixed(4);
+
+            // Ensure cost is a valid number
+            if (isNaN(cost) || cost === 'NaN') {
+                return res.status(400).json({ message: 'Error calculating cost' });
+            }
+
+            // Insert call history
+            const sqlInsert = 'INSERT INTO callhistory (name, date, calltime, cost, userid) VALUES (?, ?, ?, ?, ?)';
+            db.query(sqlInsert, [name, date, calltime, cost, userid], (err, result) => {
+                if (err) {
+                    console.error('❌ Error saving history:', err);
+                    return res.status(500).json({ message: 'Internal server error' });
+                }
+                res.json({ message: 'History saved successfully!', cost });
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ Unexpected Error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+router.get('/gethistory', (req, res) => {
+    try {
+        const sql = 'SELECT * FROM callhistory';
+        db.query(sql, (err, result) => {
+            if (err) {
+                console.error('❌ Error during Save history:', err);
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+            res.json({ message: 'Admin call history', Histoty: result })
+        })
+    } catch (error) {
+        console.log("error", error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+})
+
+router.delete('/deletehistory/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(id)
+        if (!id || isNaN(id)) {
+            return res.status(400).json({ message: 'Invalid ID provided' });
+        }
+
+        const sql = 'DELETE FROM callhistory WHERE id = ?';
+
+        db.getConnection((err, connection) => {
+            if (err) {
+                console.error('❌ Database connection error:', err);
+                return res.status(500).json({ message: 'Database connection error' });
+            }
+
+            connection.query(sql, [id], (err, result) => {
+                connection.release(); // Release the connection back to the pool
+
+                if (err) {
+                    console.error('❌ Error during deleting history:', err);
+                    return res.status(500).json({ message: 'Internal server error' });
+                }
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ message: 'History record not found' });
+                }
+                res.json({ message: 'History record deleted successfully' });
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
 // ✅ Correctly exporting the router
 module.exports = router;
