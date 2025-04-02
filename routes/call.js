@@ -223,8 +223,8 @@ router.post('/meetings/join', (req, res) => {
 
         console.log("Meeting found:", meeting);
 
-        // Generate a unique UID for this member
-        const memberUid = 2000 + teamid;
+        const timestamp = Date.now() % 100000; // Last 5 digits of timestamp
+        const memberUid = 2000 + parseInt(teamid) + timestamp;
         console.log("Generated Member UID:", memberUid);
 
         // SQL query to get team and admin details
@@ -283,13 +283,17 @@ router.post('/meetings/kick-participant', async (req, res) => {
     }
 
     const removedParticipant = meeting.teamMembers.splice(participantIndex, 1)[0];
+
+    // Add to kicked users with a short expiration (e.g., 5 minutes)
+    // This prevents immediate rejoining but isn't permanent
     kickedUsers.push({
         channelName,
         uid: parseInt(participantUid),
         kickedAt: Date.now(),
-        expiresAt: Date.now() + (60 * 60 * 1000), // 1 hour expiration
+        expiresAt: Date.now() + (1 * 60 * 1000), // 1 minutes expiration
         name: removedParticipant.name
     });
+
 
     console.log(`Participant ${removedParticipant.name} (UID: ${removedParticipant.uid}) kicked from meeting ${meeting.name}`);
 
