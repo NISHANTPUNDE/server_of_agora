@@ -127,24 +127,59 @@ router.get('/getprice', (req, res) => {
     }
 })
 
-router.post('/savehistory', (req, res) => {
+router.post('/savehistory', async (req, res) => {
     try {
-        const { name, date, calltime, cost, userid } = req.body;
+        const { name, date, calltime, userid } = req.body;
 
-        const sql = 'INSERT INTO callhistory (name, date, calltime, cost, userid) VALUES (?, ?, ?, ?, ?)';
+        // Validate input
+        if (!name || !date || !calltime || !userid) {
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
 
-        db.query(sql, [name, date, calltime, cost, userid], (err, result) => {
+        if (isNaN(calltime)) {
+            return res.status(400).json({ message: 'Invalid call time' });
+        }
+
+        // Fetch price from database
+        const sqlPrice = 'SELECT price FROM price';
+        db.query(sqlPrice, (err, priceResult) => {
             if (err) {
-                console.error('❌ Error during Save history:', err);
+                console.error('❌ Error fetching price:', err);
                 return res.status(500).json({ message: 'Internal server error' });
             }
-            res.json({ message: 'History saved successfully!' });
+            console.log("priceResult", priceResult)
+            if (!priceResult.length || isNaN(priceResult[0].price)) {
+                return res.status(400).json({ message: 'Invalid price data' });
+            }
+
+            const pricePer1000Min = parseFloat(priceResult[0].price);
+
+
+            // Calculate cost
+            const cost = ((parseFloat(calltime) / 1000) * pricePer1000Min).toFixed(4);
+
+            // Ensure cost is a valid number
+            if (isNaN(cost) || cost === 'NaN') {
+                return res.status(400).json({ message: 'Error calculating cost' });
+            }
+
+            // Insert call history
+            const sqlInsert = 'INSERT INTO callhistory (name, date, calltime, cost, userid) VALUES (?, ?, ?, ?, ?)';
+            db.query(sqlInsert, [name, date, calltime, cost, userid], (err, result) => {
+                if (err) {
+                    console.error('❌ Error saving history:', err);
+                    return res.status(500).json({ message: 'Internal server error' });
+                }
+                res.json({ message: 'History saved successfully!', cost });
+            });
         });
+
     } catch (error) {
         console.error('❌ Unexpected Error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
+
 
 router.get('/gethistory', (req, res) => {
     try {
