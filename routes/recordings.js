@@ -3,7 +3,8 @@ const router = express.Router();
 const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
-const mime = require('mime');
+const mime = require('mime-types');
+
 router.post('/', async (req, res) => {
     try {
         if (!req.file) {
@@ -36,7 +37,7 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
 
     // Check if file exists
     if (fs.existsSync(filePath)) {
-        const mimeType = mime.getType(filePath) || 'application/octet-stream';
+        const mimeType = mime.lookup(filePath) || 'application/octet-stream';
         res.setHeader('Content-Type', mimeType);
         res.sendFile(filePath);
     } else {
