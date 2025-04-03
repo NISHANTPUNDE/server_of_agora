@@ -7,6 +7,9 @@ const db = require('../config/db');
 
 // In-memory storage for active meetings
 let activeMeetings = [];
+let kickedUsers = [];
+let uidMappings = [];
+
 
 // Generate a proper Agora token
 function generateAgoraToken(channelName, uid, APP_ID, APP_CERTIFICATE) {
@@ -30,8 +33,13 @@ function generateAgoraToken(channelName, uid, APP_ID, APP_CERTIFICATE) {
     );
 }
 
+function getUserInfoFromMapping(generatedUid) {
+    const mapping = uidMappings.find(m => m.generatedUid === generatedUid);
+    return mapping ? mapping : null;
+}
 router.get('/meetings/check-participant-status/:channelName/:uid', (req, res) => {
     const { channelName, uid } = req.params;
+    const parsedUid = parseInt(uid);
 
     // Find the meeting by channel name
     const meeting = activeMeetings.find(m => m.channelName === channelName && m.isActive);
@@ -261,7 +269,6 @@ router.post('/meetings/join', (req, res) => {
 // Add this function to your server file to maintain a blacklist of kicked users
 
 // Store kicked users with timestamps to eventually expire them
-let kickedUsers = [];
 
 
 router.post('/meetings/kick-participant', async (req, res) => {
