@@ -62,7 +62,8 @@ router.get('/meetings/check-participant-status/:channelName/:uid', (req, res) =>
     }
 
     // Check if the participant is in the teamMembers array
-    const participant = meeting.teamMembers.find(m => m.uid === parseInt(uid));
+    // const participant = meeting.teamMembers.find(m => m.uid === parseInt(uid));
+    const mappingInfo = getUserInfoFromMapping(parsedUid);
 
     if (!participant) {
         // Participant not found in the meeting, they've been kicked
@@ -75,7 +76,7 @@ router.get('/meetings/check-participant-status/:channelName/:uid', (req, res) =>
     // Participant is still in the meeting
     return res.status(200).json({
         kicked: false,
-        name: participant.name
+        actualUid: mappingInfo ? mappingInfo.actualUid : null
     });
 })
 
@@ -235,8 +236,14 @@ router.post('/meetings/join', (req, res) => {
         const memberUid = 2000 + parseInt(teamid) + timestamp;
         console.log("Generated Member UID:", memberUid);
 
-        // SQL query to get team and admin details
-
+        uidMappings.push({
+            generatedUid: memberUid,
+            actualUid: actualUid || null,
+            userName: userName,
+            timestamp: Date.now(),
+            teamId: parseInt(teamid),
+            meetingId: parseInt(meetingId)
+        });
 
         // Generate a token for the team member
         const token = generateAgoraToken(meeting.channelName, memberUid, result[0].app_id, result[0].token_id);

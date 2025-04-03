@@ -41,6 +41,8 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     }
 });
 
+
+
 router.get('/:teamid', (req, res) => {
     const teamId = parseInt(req.params.teamid);
     if (!teamId) {
@@ -89,6 +91,46 @@ router.get('/:teamid', (req, res) => {
             res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
         }
     });
+});
+
+
+router.get('/recordings/admin/:adminId', (req, res) => {
+    const adminId = req.params.adminId;
+
+    const dir = path.join(process.cwd(), 'recordings', String(adminId));
+    console.log('Directory path:', dir);
+
+    try {
+        if (!fs.existsSync(dir)) {
+            console.log('Directory does not exist:', dir);
+            return res.status(404).json({ error: 'No recordings found for this admin' });
+        }
+
+        const teamFolders = fs.readdirSync(dir);
+        const recordings = [];
+
+        teamFolders.forEach(teamId => {
+            const teamDir = path.join(dir, teamId);
+            const files = fs.readdirSync(teamDir);
+
+            files.forEach(file => {
+                recordings.push({
+                    filename: file,
+                    teamId: teamId,
+                    url: `${req.protocol}://${req.get('host')}/v1/add/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
+                });
+            });
+        });
+
+        if (recordings.length === 0) {
+            return res.status(404).json({ error: 'No recordings found for this admin' });
+        }
+
+        res.status(200).json({ recordings });
+    } catch (error) {
+        console.error('Error retrieving recordings:', error.message);
+        res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
+    }
 });
 
 
