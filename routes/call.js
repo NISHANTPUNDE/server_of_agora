@@ -37,9 +37,30 @@ function getUserInfoFromMapping(generatedUid) {
     const mapping = uidMappings.find(m => m.generatedUid === generatedUid);
     return mapping ? mapping : null;
 }
+
+router.get('/meetings/user-info/:uid', (req, res) => {
+    const { uid } = req.params;
+
+    // Find user info in UID mappings without requiring channel name
+    const userInfo = uidMappings.find(m => m.generatedUid === parseInt(uid));
+
+    if (!userInfo) {
+        return res.status(404).json({
+            error: 'User information not found',
+            message: `No mapping found for UID: ${uid}`
+        });
+    }
+
+    return res.status(200).json({
+        userName: userInfo.name,
+        originalUid: userInfo.originalUid,
+        joinTime: userInfo.joinTime,
+        // channelName: userInfo.channelName
+    });
+});
 router.get('/meetings/check-participant-status/:channelName/:uid', (req, res) => {
     const { channelName, uid } = req.params;
-    const parsedUid = parseInt(uid);
+
 
     // Find the meeting by channel name
     const meeting = activeMeetings.find(m => m.channelName === channelName && m.isActive);
@@ -63,7 +84,7 @@ router.get('/meetings/check-participant-status/:channelName/:uid', (req, res) =>
 
     // Check if the participant is in the teamMembers array
     // const participant = meeting.teamMembers.find(m => m.uid === parseInt(uid));
-    
+
 
     if (!participant) {
         // Participant not found in the meeting, they've been kicked
@@ -235,6 +256,15 @@ router.post('/meetings/join', (req, res) => {
         const timestamp = Date.now() % 100000; // Last 5 digits of timestamp
         const memberUid = 2000 + parseInt(teamid) + timestamp;
         console.log("Generated Member UID:", memberUid);
+        uidMappings.push({
+            generatedUid: memberUid,
+            originalUid: parseInt(teamid),
+            name: userName,
+            channelName: meeting.channelName,
+            joinTime: new Date()
+        });
+        console.log("UID Mappings:", uidMappings);
+
 
         // SQL query to get team and admin details
 

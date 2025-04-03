@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
+const mime = require('mime');
 router.post('/', async (req, res) => {
     try {
         if (!req.file) {
@@ -35,6 +36,8 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
 
     // Check if file exists
     if (fs.existsSync(filePath)) {
+        const mimeType = mime.getType(filePath) || 'application/octet-stream';
+        res.setHeader('Content-Type', mimeType);
         res.sendFile(filePath);
     } else {
         res.status(404).json({ error: 'File not found' });
@@ -102,6 +105,7 @@ router.get('/recordings/admin/:adminId', (req, res) => {
 
     try {
         if (!fs.existsSync(dir)) {
+
             console.log('Directory does not exist:', dir);
             return res.status(404).json({ error: 'No recordings found for this admin' });
         }
