@@ -117,45 +117,45 @@ router.get('/:teamid', (req, res) => {
 });
 
 
-router.get('/recordings/admin/:adminId', (req, res) => {
-    const adminId = req.params.adminId;
+// router.get('/recordings/admin/:adminId', (req, res) => {
+//     const adminId = req.params.adminId;
 
-    const dir = path.join(process.cwd(), 'recordings', String(adminId));
-    console.log('Directory path:', dir);
+//     const dir = path.join(process.cwd(), 'recordings', String(adminId));
+//     console.log('Directory path:', dir);
 
-    try {
-        if (!fs.existsSync(dir)) {
+//     try {
+//         if (!fs.existsSync(dir)) {
 
-            console.log('Directory does not exist:', dir);
-            return res.status(404).json({ error: 'No recordings found for this admin' });
-        }
+//             console.log('Directory does not exist:', dir);
+//             return res.status(404).json({ error: 'No recordings found for this admin' });
+//         }
 
-        const teamFolders = fs.readdirSync(dir);
-        const recordings = [];
+//         const teamFolders = fs.readdirSync(dir);
+//         const recordings = [];
 
-        teamFolders.forEach(teamId => {
-            const teamDir = path.join(dir, teamId);
-            const files = fs.readdirSync(teamDir);
+//         teamFolders.forEach(teamId => {
+//             const teamDir = path.join(dir, teamId);
+//             const files = fs.readdirSync(teamDir);
 
-            files.forEach(file => {
-                recordings.push({
-                    filename: file,
-                    teamId: teamId,
-                    url: `${req.protocol}://${req.get('host')}/v1/add/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
-                });
-            });
-        });
+//             files.forEach(file => {
+                // recordings.push({
+                //     filename: file,
+                //     teamId: teamId,
+                //     url: `${req.protocol}://${req.get('host')}/v1/add/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
+                // });
+//             });
+//         });
 
-        if (recordings.length === 0) {
-            return res.status(404).json({ error: 'No recordings found for this admin' });
-        }
+//         if (recordings.length === 0) {
+//             return res.status(404).json({ error: 'No recordings found for this admin' });
+//         }
 
-        res.status(200).json({ recordings });
-    } catch (error) {
-        console.error('Error retrieving recordings:', error.message);
-        res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
-    }
-});
+//         res.status(200).json({ recordings });
+//     } catch (error) {
+//         console.error('Error retrieving recordings:', error.message);
+//         res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
+//     }
+// });
 
 // DELETE route for superadmin to delete all recordings for a specific admin
 // router.delete('/superadmin/admin/:adminId', async (req, res) => {
@@ -215,8 +215,57 @@ router.get('/recordings/admin/:adminId', (req, res) => {
 //         });
 //     }
 // });
+router.get('/recordings/admin/:adminId', async (req, res) => {
+    const adminId = req.params.adminId;
+    const dir = path.join(process.cwd(), 'recordings', String(adminId));
+    console.log('Directory path:', dir);
+
+    try {
+        if (!fs.existsSync(dir)) {
+            console.log('Directory does not exist:', dir);
+            return res.status(404).json({ error: 'No recordings found for this admin' });
+        }
+
+        const teamFolders = fs.readdirSync(dir);
+        const recordings = [];
+
+        for (const teamId of teamFolders) {
+            const teamDir = path.join(dir, teamId);
+            const files = fs.readdirSync(teamDir);
+
+            // Fetch team name from DB using promise-based query
+            const [rows] = await db.promise().query(
+                'SELECT name FROM team WHERE id = ? AND admin_id = ?',
+                [teamId, adminId]
+            );
+
+            const teamName = rows.length > 0 ? rows[0].name : null;
+
+            files.forEach(file => {
+                recordings.push({
+                    filename: file,
+                    teamId: teamId,
+                    teamName: teamName,
+                    url: `${req.protocol}://${req.get('host')}/v1/add/recordings/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
+                });
+            });
+        }
+
+        if (recordings.length === 0) {
+            return res.status(404).json({ error: 'No recordings found for this admin' });
+        }
+
+        res.status(200).json({ recordings });
+    } catch (error) {
+        console.error('Error retrieving recordings:', error.message);
+        res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
+    }
+});
+
 
 // DELETE route to delete ALL recordings across ALL admins
+
+
 router.delete('/superadmin/all', async (req, res) => {
     try {
         const superadminname = "admin@123";
