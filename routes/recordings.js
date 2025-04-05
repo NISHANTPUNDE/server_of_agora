@@ -445,6 +445,78 @@ router.delete('/admin/:adminId/team/:teamId', async (req, res) => {
     }
 });
 
+// delete recoding 
+router.delete('/recordings/delete-from-url', async (req, res) => {
+    try {
+        const { superadminname, files } = req.body;
+        const superadminKey = "admin@123";
+
+        if (superadminname !== superadminKey) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized: Invalid superadmin name'
+            });
+        }
+
+        if (!Array.isArray(files) || files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No files provided for deletion'
+            });
+        }
+
+        const recordingsDir = path.join(process.cwd(), 'recordings');
+
+        let deletedFiles = 0;
+        let errors = [];
+
+        for (const { url, teamId, filename } of files) {
+            if (!url || !teamId || !filename) {
+                errors.push({ url, teamId, filename, error: "Missing required fields" });
+                continue;
+            }
+
+            // Extract adminId from the URL (assuming fixed pattern)
+            const match = url.match(/\/recordings\/(\d+)\//);
+            const adminId = match ? match[1] : null;
+
+            if (!adminId) {
+                errors.push({ url, teamId, filename, error: "Could not extract adminId from URL" });
+                continue;
+            }
+
+            const filePath = path.join(recordingsDir, adminId, teamId.toString(), filename);
+
+            try {
+                if (fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
+                    fs.unlinkSync(filePath);
+                    deletedFiles++;
+                } else {
+                    errors.push({ adminId, teamId, filename, error: "File does not exist" });
+                }
+            } catch (err) {
+                errors.push({ adminId, teamId, filename, error: err.message });
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Deletion process completed',
+            deletedFiles,
+            failed: errors.length,
+            errors
+        });
+
+    } catch (err) {
+        console.error('Error in delete-from-url:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error while deleting files',
+            error: err.message
+        });
+    }
+});
+
 
 
 
