@@ -138,11 +138,11 @@ router.get('/:teamid', (req, res) => {
 //             const files = fs.readdirSync(teamDir);
 
 //             files.forEach(file => {
-                // recordings.push({
-                //     filename: file,
-                //     teamId: teamId,
-                //     url: `${req.protocol}://${req.get('host')}/v1/add/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
-                // });
+// recordings.push({
+//     filename: file,
+//     teamId: teamId,
+//     url: `${req.protocol}://${req.get('host')}/v1/add/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
+// });
 //             });
 //         });
 
@@ -365,82 +365,154 @@ router.delete('/superadmin/all', async (req, res) => {
 });
 
 // DELETE route to delete all recordings for a specific team
-router.delete('/admin/:adminId/team/:teamId', async (req, res) => {
+// router.delete('/admin/:adminId/team/:teamId', async (req, res) => {
+//     try {
+//         const { adminId, teamId } = req.params;
+
+//         // First verify that this admin owns this team
+//         const verifyAdminQuery = 'SELECT * FROM team WHERE id = ? AND admin_id = ?';
+
+//         db.query(verifyAdminQuery, [teamId, adminId], async (err, results) => {
+//             if (err) {
+//                 console.error('Database Error:', err.message);
+//                 return res.status(500).json({
+//                     success: false,
+//                     message: 'Database query error',
+//                     error: err.message
+//                 });
+//             }
+
+//             // If no results, this admin doesn't own the team
+//             if (!results || results.length === 0) {
+//                 return res.status(403).json({
+//                     success: false,
+//                     message: `Unauthorized: Admin ID ${adminId} is not authorized to delete recordings for user ID ${teamId}`
+//                 });
+//             }
+
+//             // Admin verified, proceed with deletion
+//             // Path to the team's recordings directory
+//             const teamDir = path.join(process.cwd(), 'recordings', String(adminId), String(teamId));
+
+//             // Check if directory exists
+//             if (!fs.existsSync(teamDir)) {
+//                 return res.status(404).json({
+//                     success: false,
+//                     message: `No recordings found for user ID: ${teamId} under admin ID: ${adminId}`
+//                 });
+//             }
+
+//             // Check if it's actually a directory
+//             if (!fs.lstatSync(teamDir).isDirectory()) {
+//                 return res.status(400).json({
+//                     success: false,
+//                     message: 'Path is not a directory'
+//                 });
+//             }
+
+//             // Get all files in the team directory
+//             const files = fs.readdirSync(teamDir);
+//             let deletedFiles = 0;
+
+//             // Delete each file in the team directory
+//             for (const file of files) {
+//                 const filePath = path.join(teamDir, file);
+//                 if (fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
+//                     fs.unlinkSync(filePath);
+//                     deletedFiles++;
+//                 }
+//             }
+
+//             // Remove the team directory if requested (optional)
+//             if (deletedFiles > 0) {
+//                 fs.rmdirSync(teamDir);
+//             }
+
+//             return res.status(200).json({
+//                 success: true,
+//                 message: `Successfully deleted all recordings for team ID: ${teamId}`,
+//                 deletedFiles: deletedFiles
+//             });
+//         });
+
+//     } catch (error) {
+//         console.error('Error deleting team recordings:', error);
+//         return res.status(500).json({
+//             success: false,
+//             message: 'Error deleting team recordings',
+//             error: error.message
+//         });
+//     }
+// });
+
+
+router.delete('/recordings/delete-from-url', async (req, res) => {
     try {
-        const { adminId, teamId } = req.params;
+        const { superadminname, files } = req.body;
+        const superadminKey = "admin@123";
 
-        // First verify that this admin owns this team
-        const verifyAdminQuery = 'SELECT * FROM team WHERE id = ? AND admin_id = ?';
+        if (superadminname !== superadminKey) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized: Invalid superadmin name'
+            });
+        }
 
-        db.query(verifyAdminQuery, [teamId, adminId], async (err, results) => {
-            if (err) {
-                console.error('Database Error:', err.message);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Database query error',
-                    error: err.message
-                });
+        if (!Array.isArray(files) || files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No files provided for deletion'
+            });
+        }
+
+        const recordingsDir = path.join(process.cwd(), 'recordings');
+
+        let deletedFiles = 0;
+        let errors = [];
+
+        for (const { url, teamId, filename } of files) {
+            if (!url || !teamId || !filename) {
+                errors.push({ url, teamId, filename, error: "Missing required fields" });
+                continue;
             }
 
-            // If no results, this admin doesn't own the team
-            if (!results || results.length === 0) {
-                return res.status(403).json({
-                    success: false,
-                    message: `Unauthorized: Admin ID ${adminId} is not authorized to delete recordings for user ID ${teamId}`
-                });
+            // Extract adminId from the URL (assuming fixed pattern)
+            const match = url.match(/\/recordings\/(\d+)\//);
+            const adminId = match ? match[1] : null;
+
+            if (!adminId) {
+                errors.push({ url, teamId, filename, error: "Could not extract adminId from URL" });
+                continue;
             }
 
-            // Admin verified, proceed with deletion
-            // Path to the team's recordings directory
-            const teamDir = path.join(process.cwd(), 'recordings', String(adminId), String(teamId));
+            const filePath = path.join(recordingsDir, adminId, teamId.toString(), filename);
 
-            // Check if directory exists
-            if (!fs.existsSync(teamDir)) {
-                return res.status(404).json({
-                    success: false,
-                    message: `No recordings found for user ID: ${teamId} under admin ID: ${adminId}`
-                });
-            }
-
-            // Check if it's actually a directory
-            if (!fs.lstatSync(teamDir).isDirectory()) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Path is not a directory'
-                });
-            }
-
-            // Get all files in the team directory
-            const files = fs.readdirSync(teamDir);
-            let deletedFiles = 0;
-
-            // Delete each file in the team directory
-            for (const file of files) {
-                const filePath = path.join(teamDir, file);
+            try {
                 if (fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
                     fs.unlinkSync(filePath);
                     deletedFiles++;
+                } else {
+                    errors.push({ adminId, teamId, filename, error: "File does not exist" });
                 }
+            } catch (err) {
+                errors.push({ adminId, teamId, filename, error: err.message });
             }
+        }
 
-            // Remove the team directory if requested (optional)
-            if (deletedFiles > 0) {
-                fs.rmdirSync(teamDir);
-            }
-
-            return res.status(200).json({
-                success: true,
-                message: `Successfully deleted all recordings for team ID: ${teamId}`,
-                deletedFiles: deletedFiles
-            });
+        return res.status(200).json({
+            success: true,
+            message: 'Deletion process completed',
+            deletedFiles,
+            failed: errors.length,
+            errors
         });
 
-    } catch (error) {
-        console.error('Error deleting team recordings:', error);
+    } catch (err) {
+        console.error('Error in delete-from-url:', err);
         return res.status(500).json({
             success: false,
-            message: 'Error deleting team recordings',
-            error: error.message
+            message: 'Server error while deleting files',
+            error: err.message
         });
     }
 });
@@ -516,6 +588,7 @@ router.delete('/recordings/delete-from-url', async (req, res) => {
         });
     }
 });
+
 
 
 
