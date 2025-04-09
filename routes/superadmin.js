@@ -212,24 +212,16 @@ router.delete('/deletehistory/:id', (req, res) => {
 
         const sql = 'DELETE FROM callhistory WHERE id = ?';
 
-        db.getConnection((err, connection) => {
+        // Use db.query() directly as it's exported from your module
+        db.query(sql, [id], (err, result) => {
             if (err) {
-                console.error('❌ Database connection error:', err);
-                return res.status(500).json({ message: 'Database connection error' });
+                console.error('❌ Error during deleting history:', err);
+                return res.status(500).json({ message: 'Internal server error' });
             }
-
-            connection.query(sql, [id], (err, result) => {
-                connection.release(); // Release the connection back to the pool
-
-                if (err) {
-                    console.error('❌ Error during deleting history:', err);
-                    return res.status(500).json({ message: 'Internal server error' });
-                }
-                if (result.affectedRows === 0) {
-                    return res.status(404).json({ message: 'History record not found' });
-                }
-                res.json({ message: 'History record deleted successfully' });
-            });
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ message: 'History record not found' });
+            }
+            res.json({ message: 'History record deleted successfully' });
         });
     } catch (error) {
         console.error('❌ Error:', error);
