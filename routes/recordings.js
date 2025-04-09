@@ -219,7 +219,7 @@ router.get('/:teamid', (req, res) => {
 //         });
 //     }
 // });
-router.get('/recordings/admin/:adminId', async (req, res) => {
+router.get('/recordings/admin/:adminId', (req, res) => {
     const adminId = req.params.adminId;
     const dir = path.join(process.cwd(), 'recordings', String(adminId));
     console.log('Directory path:', dir);
@@ -232,34 +232,49 @@ router.get('/recordings/admin/:adminId', async (req, res) => {
 
         const teamFolders = fs.readdirSync(dir);
         const recordings = [];
+        let processedFolders = 0;
 
-        for (const teamId of teamFolders) {
-            const teamDir = path.join(dir, teamId);
-            const files = fs.readdirSync(teamDir);
-
-            // Fetch team name from DB using promise-based query
-            const [rows] = await db.promise().query(
-                'SELECT name FROM team WHERE id = ? AND admin_id = ?',
-                [teamId, adminId]
-            );
-
-            const teamName = rows.length > 0 ? rows[0].name : null;
-
-            files.forEach(file => {
-                recordings.push({
-                    filename: file,
-                    teamId: teamId,
-                    teamName: teamName,
-                    url: `https://${req.get('host')}/v1/add/recordings/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
-                });
-            });
-        }
-
-        if (recordings.length === 0) {
+        // If no team folders exist
+        if (teamFolders.length === 0) {
             return res.status(404).json({ error: 'No recordings found for this admin' });
         }
 
-        res.status(200).json({ recordings });
+        teamFolders.forEach(teamId => {
+            const teamDir = path.join(dir, teamId);
+            const files = fs.readdirSync(teamDir);
+
+            // Use callback style query instead of promise
+            db.query(
+                'SELECT name FROM team WHERE id = ? AND admin_id = ?',
+                [teamId, adminId],
+                (err, rows) => {
+                    if (err) {
+                        console.error(`Error querying team name for team ID ${teamId}:`, err);
+                    }
+
+                    const teamName = rows && rows.length > 0 ? rows[0].name : null;
+
+                    files.forEach(file => {
+                        recordings.push({
+                            filename: file,
+                            teamId: teamId,
+                            teamName: teamName,
+                            url: `https://${req.get('host')}/v1/add/recordings/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
+                        });
+                    });
+
+                    processedFolders++;
+
+                    // Check if all folders have been processed
+                    if (processedFolders === teamFolders.length) {
+                        if (recordings.length === 0) {
+                            return res.status(404).json({ error: 'No recordings found for this admin' });
+                        }
+                        res.status(200).json({ recordings });
+                    }
+                }
+            );
+        });
     } catch (error) {
         console.error('Error retrieving recordings:', error.message);
         res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
@@ -267,7 +282,7 @@ router.get('/recordings/admin/:adminId', async (req, res) => {
 });
 
 // DELETE route to delete recordings within a specific date range
-router.delete('/superadmin/delete', async (req, res) => {
+router.delete('/superadmin/delete', (req, res) => {
     try {
         const superadminname = "admin@123";
         if (req.body.superadminname !== superadminname) {
@@ -298,83 +313,92 @@ router.delete('/superadmin/delete', async (req, res) => {
             return res.status(404).json({ success: false, message: 'No recordings directory found' });
         }
 
-        let allowedAdminIds = [];
-
+        // Use callback instead of promise
         if (selectedUser !== "all") {
             // Get admin ID from DB
-            const [rows] = await db.promise().query('SELECT id FROM admin WHERE name = ?', [selectedUser]);
-            if (!rows.length) {
-                return res.status(404).json({ success: false, message: 'Admin not found' });
-            }
-            allowedAdminIds = [String(rows[0].id)];
+            db.query('SELECT id FROM admin WHERE name = ?', [selectedUser], (err, rows) => {
+                if (err) {
+                    return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+                }
+
+                if (!rows.length) {
+                    return res.status(404).json({ success: false, message: 'Admin not found' });
+                }
+
+                const allowedAdminIds = [String(rows[0].id)];
+                processDeleteRecordings(allowedAdminIds);
+            });
         } else {
             // Get all admin folders (folder names are admin IDs)
-            allowedAdminIds = fs.readdirSync(recordingsDir).filter(name => {
+            const allowedAdminIds = fs.readdirSync(recordingsDir).filter(name => {
                 const fullPath = path.join(recordingsDir, name);
                 return fs.existsSync(fullPath) && fs.lstatSync(fullPath).isDirectory();
             });
+
+            processDeleteRecordings(allowedAdminIds);
         }
 
-        let deletedFiles = 0, skippedFiles = 0;
-        let emptyTeamDirs = 0, emptyAdminDirs = 0;
+        function processDeleteRecordings(allowedAdminIds) {
+            let deletedFiles = 0, skippedFiles = 0;
+            let emptyTeamDirs = 0, emptyAdminDirs = 0;
 
-        for (const adminId of allowedAdminIds) {
-            const adminDir = path.join(recordingsDir, adminId);
-            if (!fs.existsSync(adminDir) || !fs.lstatSync(adminDir).isDirectory()) continue;
+            for (const adminId of allowedAdminIds) {
+                const adminDir = path.join(recordingsDir, adminId);
+                if (!fs.existsSync(adminDir) || !fs.lstatSync(adminDir).isDirectory()) continue;
 
-            const teamFolders = fs.readdirSync(adminDir);
-            for (const teamId of teamFolders) {
-                const teamDir = path.join(adminDir, teamId);
-                if (!fs.existsSync(teamDir) || !fs.lstatSync(teamDir).isDirectory()) continue;
+                const teamFolders = fs.readdirSync(adminDir);
+                for (const teamId of teamFolders) {
+                    const teamDir = path.join(adminDir, teamId);
+                    if (!fs.existsSync(teamDir) || !fs.lstatSync(teamDir).isDirectory()) continue;
 
-                const files = fs.readdirSync(teamDir);
-                for (const file of files) {
-                    const filePath = path.join(teamDir, file);
-                    try {
-                        const stats = fs.statSync(filePath);
-                        const fileDate = new Date(stats.ctime);
+                    const files = fs.readdirSync(teamDir);
+                    for (const file of files) {
+                        const filePath = path.join(teamDir, file);
+                        try {
+                            const stats = fs.statSync(filePath);
+                            const fileDate = new Date(stats.ctime);
 
-                        if (fileDate >= from && fileDate <= to) {
-                            fs.unlinkSync(filePath);
-                            deletedFiles++;
-                        } else {
+                            if (fileDate >= from && fileDate <= to) {
+                                fs.unlinkSync(filePath);
+                                deletedFiles++;
+                            } else {
+                                skippedFiles++;
+                            }
+                        } catch (err) {
+                            console.error('File stat error:', filePath, err.message);
                             skippedFiles++;
                         }
-                    } catch (err) {
-                        console.error('File stat error:', filePath, err.message);
-                        skippedFiles++;
+                    }
+
+                    // Remove empty team directory
+                    if (fs.readdirSync(teamDir).length === 0) {
+                        fs.rmdirSync(teamDir);
+                        emptyTeamDirs++;
                     }
                 }
 
-                // Remove empty team directory
-                if (fs.readdirSync(teamDir).length === 0) {
-                    fs.rmdirSync(teamDir);
-                    emptyTeamDirs++;
+                // Remove empty admin directory
+                if (fs.readdirSync(adminDir).length === 0) {
+                    fs.rmdirSync(adminDir);
+                    emptyAdminDirs++;
                 }
             }
 
-            // Remove empty admin directory
-            if (fs.readdirSync(adminDir).length === 0) {
-                fs.rmdirSync(adminDir);
-                emptyAdminDirs++;
-            }
+            return res.status(200).json({
+                success: true,
+                message: 'Successfully deleted recordings',
+                dateRange: {
+                    from: from.toISOString(),
+                    to: to.toISOString()
+                },
+                stats: {
+                    deletedFiles,
+                    skippedFiles,
+                    emptyTeamDirs,
+                    emptyAdminDirs
+                }
+            });
         }
-
-        return res.status(200).json({
-            success: true,
-            message: 'Successfully deleted recordings',
-            dateRange: {
-                from: from.toISOString(),
-                to: to.toISOString()
-            },
-            stats: {
-                deletedFiles,
-                skippedFiles,
-                emptyTeamDirs,
-                emptyAdminDirs
-            }
-        });
-
     } catch (error) {
         console.error('Error during delete:', error.message);
         return res.status(500).json({
