@@ -312,7 +312,7 @@ router.delete('/superadmin/delete', (req, res) => {
         if (!fs.existsSync(recordingsDir)) {
             return res.status(404).json({ success: false, message: 'No recordings directory found' });
         }
-
+        console.log(selectedUser, "selectedUser")
         // Use callback instead of promise
         if (selectedUser !== null || selectedUser !== "all") {
             // Get admin ID from DB
