@@ -314,7 +314,7 @@ router.delete('/superadmin/delete', (req, res) => {
         }
 
         // Use callback instead of promise
-        if (selectedUser !== "all") {
+        if (selectedUser !== null || selectedUser !== "all") {
             // Get admin ID from DB
             db.query('SELECT id FROM admin WHERE name = ?', [selectedUser], (err, rows) => {
                 if (err) {
