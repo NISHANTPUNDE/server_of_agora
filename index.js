@@ -133,7 +133,7 @@ const upload = multer({ storage: storage });
 app.use('/v1/add/recordings', upload.single('recording'), recordings);
 
 app.use('/v1/download/app', (req, res) => {
-    const filePath = path.join(__dirname, 'app', 'skyvoice.apk');
+    const filePath = path.join(__dirname, 'app', 'skaivoice.apk');
     res.download(filePath, (err) => {
         if (err) {
             console.error("File Download Error:", err);
