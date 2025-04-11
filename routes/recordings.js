@@ -34,109 +34,124 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const decodedFilename = decodeURIComponent(filename);
     const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
 
-    console.log('Attempting to stream file:', filePath);
+    // Log request details for debugging
+    console.log('Request headers:', req.headers);
+    console.log('Streaming file path:', filePath);
 
     // Check if file exists
-    fs.access(filePath, fs.constants.F_OK, (err) => {
-        if (err) {
-            console.error('File not found:', filePath);
-            return res.status(404).json({ error: 'File not found' });
+    if (!fs.existsSync(filePath)) {
+        console.error('File not found:', filePath);
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Get file stats
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+
+    console.log('File size:', fileSize);
+    console.log('MIME type:', mimeType);
+
+    // Handle range request
+    const range = req.headers.range;
+
+    if (range) {
+        console.log('Range header:', range);
+
+        // Parse range (handle multiple ranges by taking the first one only)
+        const parts = range.replace(/bytes=/, '').split(',')[0].split('-');
+        let start = parseInt(parts[0], 10);
+        let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+        // Safety bounds checking
+        if (isNaN(start)) {
+            start = 0;
         }
 
-        // Get file stats
-        fs.stat(filePath, (err, stat) => {
-            if (err) {
-                console.error('Error accessing file stats:', err);
-                return res.status(500).json({ error: 'Server error' });
-            }
+        if (isNaN(end) || end >= fileSize) {
+            end = fileSize - 1;
+        }
 
-            // Get file size
-            const fileSize = stat.size;
+        if (start >= fileSize) {
+            // Return the 416 Range Not Satisfiable
+            console.error('Range not satisfiable:', start, '>=', fileSize);
+            return res.status(416).set({
+                'Content-Range': `bytes */${fileSize}`
+            }).end();
+        }
 
-            // Determine content type
-            const mimeType = mime.lookup(filePath) || 'application/octet-stream';
-            console.log('File MIME type:', mimeType);
+        // Calculate chunk size
+        const chunkSize = (end - start) + 1;
+        console.log(`Streaming range: ${start}-${end}/${fileSize} (${chunkSize} bytes)`);
 
-            // Handle range requests
-            const range = req.headers.range;
-            console.log('Range header:', range);
+        // Set headers with a longer timeout
+        res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Content-Type': mimeType,
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600',
+            'Connection': 'keep-alive'
+        });
 
-            if (range) {
-                // Parse range
-                const parts = range.replace(/bytes=/, '').split('-');
-                const start = parseInt(parts[0], 10);
-                const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        // Create read stream for range
+        const stream = fs.createReadStream(filePath, {
+            start,
+            end,
+            highWaterMark: 64 * 1024 // Optimize buffer size for streaming
+        });
 
-                // Validate range
-                if (start >= fileSize || end >= fileSize) {
-                    // Return the 416 Range Not Satisfiable if the range is invalid
-                    return res.status(416).set({
-                        'Content-Range': `bytes */${fileSize}`
-                    }).end();
-                }
-
-                // Calculate chunk size
-                const chunkSize = (end - start) + 1;
-                console.log(`Streaming range: ${start}-${end} (${chunkSize} bytes)`);
-
-                // Set headers
-                res.set({
-                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                    'Accept-Ranges': 'bytes',
-                    'Content-Length': chunkSize,
-                    'Content-Type': mimeType,
-                    'Access-Control-Allow-Origin': '*'
-                });
-
-                // HTTP Status 206 for Partial Content
-                res.status(206);
-
-                // Create file stream for range
-                const stream = fs.createReadStream(filePath, { start, end });
-
-                // Handle stream errors
-                stream.on('error', (streamErr) => {
-                    console.error('Stream error:', streamErr);
-                    if (!res.headersSent) {
-                        res.status(500).json({ error: 'Stream error' });
-                    } else {
-                        res.end();
-                    }
-                });
-
-                // Pipe the file stream to response
-                stream.pipe(res);
-            } else {
-                // Full file request
-                console.log(`Streaming full file: ${fileSize} bytes`);
-
-                // Set headers
-                res.set({
-                    'Content-Length': fileSize,
-                    'Content-Type': mimeType,
-                    'Accept-Ranges': 'bytes',
-                    'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=3600'
-                });
-
-                // Create file stream
-                const stream = fs.createReadStream(filePath);
-
-                // Handle stream errors
-                stream.on('error', (streamErr) => {
-                    console.error('Stream error:', streamErr);
-                    if (!res.headersSent) {
-                        res.status(500).json({ error: 'Stream error' });
-                    } else {
-                        res.end();
-                    }
-                });
-
-                // Pipe the file stream to response
-                stream.pipe(res);
+        // Handle stream errors
+        stream.on('error', (err) => {
+            console.error('Stream error:', err);
+            if (!res.finished) {
+                res.end();
             }
         });
-    });
+
+        // Handle close events
+        req.on('close', () => {
+            stream.destroy(); // Properly destroy the stream if request is closed
+            console.log('Request closed by client');
+        });
+
+        // Stream the file
+        stream.pipe(res);
+
+    } else {
+        // Set headers for full file
+        res.writeHead(200, {
+            'Content-Length': fileSize,
+            'Content-Type': mimeType,
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600',
+            'Connection': 'keep-alive'
+        });
+
+        // Create read stream for full file
+        const stream = fs.createReadStream(filePath, {
+            highWaterMark: 64 * 1024 // Optimize buffer size
+        });
+
+        // Handle stream errors
+        stream.on('error', (err) => {
+            console.error('Stream error:', err);
+            if (!res.finished) {
+                res.end();
+            }
+        });
+
+        // Handle close events
+        req.on('close', () => {
+            stream.destroy(); // Properly destroy the stream if request is closed
+            console.log('Request closed by client');
+        });
+
+        // Stream the file
+        stream.pipe(res);
+    }
 });
 
 
