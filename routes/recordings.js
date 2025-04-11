@@ -31,28 +31,18 @@ router.post('/', async (req, res) => {
 // Dynamic route to serve recording files
 router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
-    const decodedFilename = decodeURIComponent(filename);
-    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
-
+    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
     console.log('Serving file from path:', filePath);
 
+    // Check if file exists
     if (fs.existsSync(filePath)) {
         const mimeType = mime.lookup(filePath) || 'application/octet-stream';
-
-        // ✅ Set CORS + proper streaming headers
-        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Disposition', 'attachment; filename="recording.m4a"');
-
-        // ✅ Stream the file instead of using res.sendFile
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
-
+        res.sendFile(filePath);
     } else {
         res.status(404).json({ error: 'File not found' });
     }
 });
-
 
 
 
