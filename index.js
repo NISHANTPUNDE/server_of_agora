@@ -77,8 +77,7 @@ io.on('connection', (socket) => {
 app.use(cors({
     origin: '*', // Allow from all origins (or specify your frontend domain)
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Range'],  // Add 'Range' for streaming audio
-    exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
+    exposedHeaders: ['Content-Type'], // Expose Content-Type header
 }));
 
 app.use(express.json({ limit: '50mb' }));

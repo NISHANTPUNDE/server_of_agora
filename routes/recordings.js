@@ -28,73 +28,32 @@ router.post('/', async (req, res) => {
     }
 });
 
-// This is a standalone route handler specifically for serving the audio files
+// Dynamic route to serve recording files
 router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
-    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
+    const decodedFilename = decodeURIComponent(filename);
+    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
 
-    // Check file exists
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).send('File not found');
-    }
+    console.log('Serving file from path:', filePath);
 
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
+    if (fs.existsSync(filePath)) {
+        const mimeType = mime.lookup(filePath) || 'application/octet-stream';
 
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'audio/mp4');
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'no-cache');
+        // ✅ Set CORS + proper streaming headers
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', 'inline'); // ← Tells browser to play, not download
 
-    // Handle range requests
-    const range = req.headers.range;
-    if (range) {
-        // Parse range
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        // Handle end of range request properly
-        const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + 1024 * 1024, fileSize - 1); // Limit chunk size to 1MB
+        // ✅ Stream the file instead of using res.sendFile
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
 
-        // Calculate chunk size
-        const chunksize = (end - start) + 1;
-
-        // Set partial content headers
-        res.status(206);
-        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
-        res.setHeader('Content-Length', chunksize);
-
-        // Create and pipe stream with error handling
-        const stream = fs.createReadStream(filePath, { start, end });
-        stream.on('error', (error) => {
-            console.error(`Stream error: ${error.message}`);
-            if (!res.headersSent) {
-                res.status(500).send('Error streaming file');
-            } else {
-                res.end();
-            }
-        });
-
-        stream.pipe(res);
     } else {
-        // For non-range requests, set content length
-        res.setHeader('Content-Length', fileSize);
-
-        // Use smaller chunk size for large files
-        const options = fileSize > 10 * 1024 * 1024 ? { highWaterMark: 1024 * 1024 } : {};
-        const stream = fs.createReadStream(filePath, options);
-
-        stream.on('error', (error) => {
-            console.error(`Stream error: ${error.message}`);
-            if (!res.headersSent) {
-                res.status(500).send('Error streaming file');
-            } else {
-                res.end();
-            }
-        });
-
-        stream.pipe(res);
+        res.status(404).json({ error: 'File not found' });
     }
 });
+
+
 
 
 
