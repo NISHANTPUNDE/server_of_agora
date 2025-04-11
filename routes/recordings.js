@@ -34,70 +34,109 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const decodedFilename = decodeURIComponent(filename);
     const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
 
-    console.log('Serving file from path:', filePath);
+    console.log('Attempting to stream file:', filePath);
 
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'File not found' });
-    }
+    // Check if file exists
+    fs.access(filePath, fs.constants.F_OK, (err) => {
+        if (err) {
+            console.error('File not found:', filePath);
+            return res.status(404).json({ error: 'File not found' });
+        }
 
-    // Get file stats
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-    const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+        // Get file stats
+        fs.stat(filePath, (err, stat) => {
+            if (err) {
+                console.error('Error accessing file stats:', err);
+                return res.status(500).json({ error: 'Server error' });
+            }
 
-    // Handle range requests (critical for audio/video)
-    const range = req.headers.range;
+            // Get file size
+            const fileSize = stat.size;
 
-    if (range) {
-        // Parse range header
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            // Determine content type
+            const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+            console.log('File MIME type:', mimeType);
 
-        // Calculate chunk size
-        const chunkSize = (end - start) + 1;
+            // Handle range requests
+            const range = req.headers.range;
+            console.log('Range header:', range);
 
-        // Create headers
-        const headers = {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize,
-            'Content-Type': mimeType,
-            'Access-Control-Allow-Origin': '*'
-        };
+            if (range) {
+                // Parse range
+                const parts = range.replace(/bytes=/, '').split('-');
+                const start = parseInt(parts[0], 10);
+                const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
-        // HTTP Status 206 for Partial Content
-        res.writeHead(206, headers);
+                // Validate range
+                if (start >= fileSize || end >= fileSize) {
+                    // Return the 416 Range Not Satisfiable if the range is invalid
+                    return res.status(416).set({
+                        'Content-Range': `bytes */${fileSize}`
+                    }).end();
+                }
 
-        // Create and pipe read stream for the specific range
-        const fileStream = fs.createReadStream(filePath, { start, end });
-        fileStream.on('error', (err) => {
-            console.error('Stream error:', err);
-            if (!res.headersSent) {
-                res.status(500).json({ error: 'Error streaming file' });
+                // Calculate chunk size
+                const chunkSize = (end - start) + 1;
+                console.log(`Streaming range: ${start}-${end} (${chunkSize} bytes)`);
+
+                // Set headers
+                res.set({
+                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': chunkSize,
+                    'Content-Type': mimeType,
+                    'Access-Control-Allow-Origin': '*'
+                });
+
+                // HTTP Status 206 for Partial Content
+                res.status(206);
+
+                // Create file stream for range
+                const stream = fs.createReadStream(filePath, { start, end });
+
+                // Handle stream errors
+                stream.on('error', (streamErr) => {
+                    console.error('Stream error:', streamErr);
+                    if (!res.headersSent) {
+                        res.status(500).json({ error: 'Stream error' });
+                    } else {
+                        res.end();
+                    }
+                });
+
+                // Pipe the file stream to response
+                stream.pipe(res);
+            } else {
+                // Full file request
+                console.log(`Streaming full file: ${fileSize} bytes`);
+
+                // Set headers
+                res.set({
+                    'Content-Length': fileSize,
+                    'Content-Type': mimeType,
+                    'Accept-Ranges': 'bytes',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=3600'
+                });
+
+                // Create file stream
+                const stream = fs.createReadStream(filePath);
+
+                // Handle stream errors
+                stream.on('error', (streamErr) => {
+                    console.error('Stream error:', streamErr);
+                    if (!res.headersSent) {
+                        res.status(500).json({ error: 'Stream error' });
+                    } else {
+                        res.end();
+                    }
+                });
+
+                // Pipe the file stream to response
+                stream.pipe(res);
             }
         });
-        fileStream.pipe(res);
-    } else {
-        // If no range is requested, send the entire file with appropriate headers
-        const headers = {
-            'Content-Length': fileSize,
-            'Content-Type': mimeType,
-            'Accept-Ranges': 'bytes',
-            'Access-Control-Allow-Origin': '*'
-        };
-
-        res.writeHead(200, headers);
-
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.on('error', (err) => {
-            console.error('Stream error:', err);
-            if (!res.headersSent) {
-                res.status(500).json({ error: 'Error streaming file' });
-            }
-        });
-        fileStream.pipe(res);
-    }
+    });
 });
 
 
