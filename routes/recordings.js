@@ -34,126 +34,64 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const decodedFilename = decodeURIComponent(filename);
     const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
 
-    // Log request details for debugging
-    console.log('Request headers:', req.headers);
-    console.log('Streaming file path:', filePath);
-
     // Check if file exists
     if (!fs.existsSync(filePath)) {
-        console.error('File not found:', filePath);
         return res.status(404).json({ error: 'File not found' });
     }
 
-    // Get file stats
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
-    const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+    let mimeType = mime.lookup(filePath);
+    mimeType = mimeType || (filePath.endsWith('.m4a') ? 'audio/mp4' : 'application/octet-stream');
 
-    console.log('File size:', fileSize);
-    console.log('MIME type:', mimeType);
-
-    // Handle range request
     const range = req.headers.range;
 
     if (range) {
-        console.log('Range header:', range);
-
-        // Parse range (handle multiple ranges by taking the first one only)
-        const parts = range.replace(/bytes=/, '').split(',')[0].split('-');
-        let start = parseInt(parts[0], 10);
+        const parts = range.replace(/bytes=/, '').split('-');
+        let start = parseInt(parts[0], 10) || 0;
         let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
-        // Safety bounds checking
-        if (isNaN(start)) {
-            start = 0;
-        }
-
-        if (isNaN(end) || end >= fileSize) {
-            end = fileSize - 1;
-        }
+        start = Math.max(0, start);
+        end = Math.min(end, fileSize - 1);
 
         if (start >= fileSize) {
-            // Return the 416 Range Not Satisfiable
-            console.error('Range not satisfiable:', start, '>=', fileSize);
-            return res.status(416).set({
-                'Content-Range': `bytes */${fileSize}`
-            }).end();
+            return res.status(416).set({ 'Content-Range': `bytes */${fileSize}` }).end();
         }
 
-        // Calculate chunk size
-        const chunkSize = (end - start) + 1;
-        console.log(`Streaming range: ${start}-${end}/${fileSize} (${chunkSize} bytes)`);
-
-        // Set headers with a longer timeout
+        const chunkSize = end - start + 1;
         res.writeHead(206, {
             'Content-Range': `bytes ${start}-${end}/${fileSize}`,
             'Accept-Ranges': 'bytes',
             'Content-Length': chunkSize,
             'Content-Type': mimeType,
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, max-age=3600',
-            'Connection': 'keep-alive'
+            'Cache-Control': 'public, max-age=3600'
         });
 
-        // Create read stream for range
-        const stream = fs.createReadStream(filePath, {
-            start,
-            end,
-            highWaterMark: 64 * 1024 // Optimize buffer size for streaming
-        });
-
-        // Handle stream errors
+        const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 1024 * 1024 });
         stream.on('error', (err) => {
             console.error('Stream error:', err);
-            if (!res.finished) {
-                res.end();
-            }
+            res.end();
         });
-
-        // Handle close events
-        req.on('close', () => {
-            stream.destroy(); // Properly destroy the stream if request is closed
-            console.log('Request closed by client');
-        });
-
-        // Stream the file
         stream.pipe(res);
-
     } else {
-        // Set headers for full file
         res.writeHead(200, {
             'Content-Length': fileSize,
             'Content-Type': mimeType,
             'Accept-Ranges': 'bytes',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, max-age=3600',
-            'Connection': 'keep-alive'
+            'Cache-Control': 'public, max-age=3600'
         });
-
-        // Create read stream for full file
-        const stream = fs.createReadStream(filePath, {
-            highWaterMark: 64 * 1024 // Optimize buffer size
-        });
-
-        // Handle stream errors
+        const stream = fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 });
         stream.on('error', (err) => {
             console.error('Stream error:', err);
-            if (!res.finished) {
-                res.end();
-            }
+            res.end();
         });
-
-        // Handle close events
-        req.on('close', () => {
-            stream.destroy(); // Properly destroy the stream if request is closed
-            console.log('Request closed by client');
-        });
-
-        // Stream the file
         stream.pipe(res);
     }
-});
 
+    req.on('close', () => {
+        stream.destroy();
+    });
+});
 
 
 
