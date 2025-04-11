@@ -28,56 +28,65 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Dynamic route to serve recording files
+// This is a standalone route handler specifically for serving the audio files
 router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
-    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
-    
+
     // Log for debugging
-    console.log('Requested file path:', filePath);
-    
+    console.log(`Serving recording: Admin=${adminId}, Team=${teamId}, File=${filename}`);
+
+    // Construct the correct file path
+    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
+
     // Check if file exists
     if (!fs.existsSync(filePath)) {
-        console.error('File not found:', filePath);
-        return res.status(404).json({ error: 'File not found' });
+        console.error(`File not found: ${filePath}`);
+        return res.status(404).send('File not found');
     }
-    
-    // Get file stats
-    const stat = fs.statSync(filePath);
-    
-    // Set proper MIME type for m4a files
-    let contentType;
-    if (path.extname(filePath).toLowerCase() === '.m4a') {
-        contentType = 'audio/mp4';
-    } else {
-        contentType = mime.lookup(filePath) || 'application/octet-stream';
-    }
-    
-    // Handle range requests (important for audio streaming)
-    const range = req.headers.range;
-    if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
-        
-        const chunksize = (end - start) + 1;
-        
-        res.status(206);
-        res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
-        res.setHeader('Content-Length', chunksize);
-        res.setHeader('Content-Type', contentType);
+
+    try {
+        const stat = fs.statSync(filePath);
+
+        // Set proper headers for audio streaming (specifically for .m4a files)
+        res.setHeader('Content-Type', 'audio/mp4');  // Correct MIME type for .m4a
         res.setHeader('Accept-Ranges', 'bytes');
-        
-        const stream = fs.createReadStream(filePath, {start, end});
-        stream.pipe(res);
-    } else {
-        // Stream the entire file
         res.setHeader('Content-Length', stat.size);
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Accept-Ranges', 'bytes');
-        
-        const stream = fs.createReadStream(filePath);
-        stream.pipe(res);
+
+        // Handle range requests (important for audio seeking)
+        const range = req.headers.range;
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+
+            const chunksize = (end - start) + 1;
+
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+            res.setHeader('Content-Length', chunksize);
+
+            const stream = fs.createReadStream(filePath, { start, end });
+            stream.on('error', (err) => {
+                console.error(`Stream error: ${err}`);
+                if (!res.headersSent) {
+                    res.status(500).send('Error streaming file');
+                }
+            });
+            stream.pipe(res);
+        } else {
+            // Stream the entire file
+            const stream = fs.createReadStream(filePath);
+            stream.on('error', (err) => {
+                console.error(`Stream error: ${err}`);
+                if (!res.headersSent) {
+                    res.status(500).send('Error streaming file');
+                }
+            });
+            stream.pipe(res);
+        }
+    } catch (error) {
+        console.error(`Error serving file: ${error.message}`);
+        res.status(500).send('Server error');
     }
 });
 
