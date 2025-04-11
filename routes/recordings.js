@@ -35,7 +35,7 @@ router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const decodedFilename = decodeURIComponent(filename);
     const originalPath = path.join('recordings', adminId, teamId, decodedFilename);
-    const optimizedDir = path.join('recordings-optimized', adminId, teamId); // New directory
+    const optimizedDir = path.join('recordings-optimized', adminId, teamId);
     const optimizedPath = path.join(optimizedDir, decodedFilename);
 
     // Create optimized directory if missing
@@ -46,10 +46,9 @@ router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
     // Check if optimized file exists
     if (!fs.existsSync(optimizedPath)) {
         try {
-            // Generate optimized version
             execSync(
                 `ffmpeg -i "${originalPath}" -movflags faststart -c copy "${optimizedPath}"`,
-                { stdio: 'ignore' } // Suppress logs
+                { stdio: 'ignore' }
             );
             console.log('Optimized file created:', optimizedPath);
         } catch (error) {
@@ -58,8 +57,8 @@ router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
         }
     }
 
-    // Serve the optimized file
-    res.sendFile(optimizedPath);
+    // Serve the optimized file with explicit root
+    res.sendFile(optimizedPath, { root: process.cwd() }); // Fix here
 });
 
 
