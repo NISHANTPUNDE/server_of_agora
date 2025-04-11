@@ -76,7 +76,7 @@ io.on('connection', (socket) => {
 
 app.use(cors({
     origin: '*', // Allow from all origins (or specify your frontend domain)
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS'],
     exposedHeaders: ['Content-Type'], // Expose Content-Type header
 }));
 
@@ -147,5 +147,7 @@ const PORT = process.env.PORT || 4020;
 httpServer.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 });
+
+
 
 module.exports = { app, io };
