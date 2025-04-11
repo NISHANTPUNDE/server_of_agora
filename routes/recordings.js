@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
 const stream = require('stream');
+const { execSync } = require('child_process');
 
 router.post('/', async (req, res) => {
     try {
@@ -30,68 +31,35 @@ router.post('/', async (req, res) => {
 });
 
 // Dynamic route to serve recording files
-router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
+router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const decodedFilename = decodeURIComponent(filename);
-    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
+    const originalPath = path.join('recordings', adminId, teamId, decodedFilename);
+    const optimizedDir = path.join('recordings-optimized', adminId, teamId); // New directory
+    const optimizedPath = path.join(optimizedDir, decodedFilename);
 
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'File not found' });
+    // Create optimized directory if missing
+    if (!fs.existsSync(optimizedDir)) {
+        fs.mkdirSync(optimizedDir, { recursive: true });
     }
 
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-    let mimeType = mime.lookup(filePath);
-    mimeType = mimeType || (filePath.endsWith('.m4a') ? 'audio/mp4' : 'application/octet-stream');
-
-    const range = req.headers.range;
-
-    if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        let start = parseInt(parts[0], 10) || 0;
-        let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-        start = Math.max(0, start);
-        end = Math.min(end, fileSize - 1);
-
-        if (start >= fileSize) {
-            return res.status(416).set({ 'Content-Range': `bytes */${fileSize}` }).end();
+    // Check if optimized file exists
+    if (!fs.existsSync(optimizedPath)) {
+        try {
+            // Generate optimized version
+            execSync(
+                `ffmpeg -i "${originalPath}" -movflags faststart -c copy "${optimizedPath}"`,
+                { stdio: 'ignore' } // Suppress logs
+            );
+            console.log('Optimized file created:', optimizedPath);
+        } catch (error) {
+            console.error('FFmpeg failed:', error);
+            return res.status(500).send('File processing failed');
         }
-
-        const chunkSize = end - start + 1;
-        res.writeHead(206, {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize,
-            'Content-Type': mimeType,
-            'Cache-Control': 'public, max-age=3600'
-        });
-
-        const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 1024 * 1024 });
-        stream.on('error', (err) => {
-            console.error('Stream error:', err);
-            res.end();
-        });
-        stream.pipe(res);
-    } else {
-        res.writeHead(200, {
-            'Content-Length': fileSize,
-            'Content-Type': mimeType,
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'public, max-age=3600'
-        });
-        const stream = fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 });
-        stream.on('error', (err) => {
-            console.error('Stream error:', err);
-            res.end();
-        });
-        stream.pipe(res);
     }
 
-    req.on('close', () => {
-        stream.destroy();
-    });
+    // Serve the optimized file
+    res.sendFile(optimizedPath);
 });
 
 
