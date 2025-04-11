@@ -42,7 +42,7 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
         // ✅ Set CORS + proper streaming headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Disposition', 'inline'); // ← Tells browser to play, not download
+        res.setHeader('Content-Disposition', 'attachment; filename="recording.m4a"');
 
         // ✅ Stream the file instead of using res.sendFile
         const fileStream = fs.createReadStream(filePath);
