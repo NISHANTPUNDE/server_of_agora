@@ -31,66 +31,22 @@ router.post('/', async (req, res) => {
 });
 
 // Dynamic route to serve recording files
-router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
+router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
-    const decodedFilename = decodeURIComponent(filename);
-    const originalPath = path.join('recordings', adminId, teamId, decodedFilename);
-    const optimizedDir = path.join('recordings-optimized', adminId, teamId);
-    const optimizedPath = path.join(optimizedDir, decodedFilename);
+    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
+    console.log('Serving file from path:', filePath);
 
-    // Create optimized directory if missing
-    if (!fs.existsSync(optimizedDir)) {
-        fs.mkdirSync(optimizedDir, { recursive: true });
-    }
-
-    // Check if optimized file exists
-    if (!fs.existsSync(optimizedPath)) {
-        try {
-            execSync(
-                `ffmpeg -i "${originalPath}" -movflags faststart -c copy "${optimizedPath}"`,
-                { stdio: 'ignore' }
-            );
-            console.log('Optimized file created:', optimizedPath);
-        } catch (error) {
-            console.error('FFmpeg failed:', error);
-            return res.status(500).send('File processing failed');
-        }
-    }
-
-    // Get file stats for range requests
-    const stat = fs.statSync(optimizedPath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-
-    if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunksize = (end - start) + 1;
-        const file = fs.createReadStream(optimizedPath, { start, end });
-        const head = {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunksize,
-            'Content-Type': 'audio/mp4',
-        };
-
-        res.writeHead(206, head);
-        file.pipe(res);
+    // Check if file exists
+    if (fs.existsSync(filePath)) {
+        const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+        res.setHeader('Content-Type', mimeType);
+        res.sendFile(filePath);
     } else {
-        const head = {
-            'Content-Length': fileSize,
-            'Content-Type': 'audio/mp4',
-        };
-
-        res.writeHead(200, head);
-        fs.createReadStream(optimizedPath).pipe(res);
+        res.status(404).json({ error: 'File not found' });
     }
 });
 
 
-
-// router.get('/recordings/admin/:adminId', (req, res) => {
 //     const adminId = req.params.adminId;
 
 //     const dir = path.join(process.cwd(), 'recordings', String(adminId));
