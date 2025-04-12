@@ -35,52 +35,31 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
     console.log('Serving file from path:', filePath);
-
+    
     // Check if file exists
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'File not found' });
     }
-
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-
-    // Force the correct MIME type for M4A files
-    const mimeType = 'audio/mp4';
-
-    // Handle range requests
-    const range = req.headers.range;
-    if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunkSize = (end - start) + 1;
-
-        console.log(`Range request: ${start}-${end}/${fileSize}`);
-
-        const file = fs.createReadStream(filePath, { start, end });
-        const headers = {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize,
-            'Content-Type': mimeType,
-            'Cache-Control': 'no-cache'
-        };
-
-        res.writeHead(206, headers);
-        file.pipe(res);
-    } else {
-        // Full file request
-        const headers = {
-            'Content-Length': fileSize,
-            'Content-Type': mimeType,
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'no-cache'
-        };
-
-        res.writeHead(200, headers);
-        fs.createReadStream(filePath).pipe(res);
-    }
+    
+    // Options for sendFile
+    const options = {
+        headers: {
+            'Content-Type': 'audio/mp4',
+            'Accept-Ranges': 'bytes'
+        }
+    };
+    
+    // Use Express's sendFile which handles ranges properly
+    res.sendFile(filePath, options, (err) => {
+        if (err) {
+            console.error('Error sending file:', err);
+            if (!res.headersSent) {
+                res.status(500).send('Error streaming audio file');
+            }
+        }
+    });
 });
+
 
 
 //     const adminId = req.params.adminId;
