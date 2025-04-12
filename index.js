@@ -75,9 +75,10 @@ io.on('connection', (socket) => {
 
 
 app.use(cors({
-    origin: '*', // Allow from all origins (or specify your frontend domain)
-    methods: ['GET', 'POST', 'PUT', 'DELETE','OPTIONS'],
-    exposedHeaders: ['Content-Type'], // Expose Content-Type header
+    origin: '*', // In production, specify your domains
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges'],
+    allowedHeaders: ['Content-Type', 'Range']
 }));
 
 app.use(express.json({ limit: '50mb' }));

@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
 });
 
 // Dynamic route to serve recording files
-router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
+app.get('/v1/add/recordings/recordings/:adminId/:teamId/:filename', async (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const decodedFilename = decodeURIComponent(filename);
     const originalPath = path.join('recordings', adminId, teamId, decodedFilename);
@@ -57,8 +57,35 @@ router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
         }
     }
 
-    // Serve the optimized file with explicit root
-    res.sendFile(optimizedPath, { root: process.cwd() }); // Fix here
+    // Get file stats for range requests
+    const stat = fs.statSync(optimizedPath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(optimizedPath, { start, end });
+        const head = {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': 'audio/mp4',
+        };
+
+        res.writeHead(206, head);
+        file.pipe(res);
+    } else {
+        const head = {
+            'Content-Length': fileSize,
+            'Content-Type': 'audio/mp4',
+        };
+
+        res.writeHead(200, head);
+        fs.createReadStream(optimizedPath).pipe(res);
+    }
 });
 
 
