@@ -41,39 +41,53 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
 
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
-    const range = req.headers.range;
-    const mimeType = mime.lookup(filePath) || 'application/octet-stream';
 
-    if (range) {
-        // Parse Range
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunkSize = end - start + 1;
+    // Set the appropriate MIME type
+    res.setHeader('Content-Type', 'audio/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-        const file = fs.createReadStream(filePath, { start, end });
+    // Handle range requests
+    if (req.headers.range) {
+        const ranges = rangeParser(fileSize, req.headers.range);
 
-        res.writeHead(206, {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize,
-            'Content-Type': mimeType,
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
+        if (ranges === -1 || ranges === -2 || ranges.type !== 'bytes') {
+            // Invalid range
+            res.setHeader('Content-Range', `bytes */${fileSize}`);
+            return res.status(416).send('Range Not Satisfiable');
+        }
+
+        const range = ranges[0]; // Get the first range
+        const stream = fs.createReadStream(filePath, { start: range.start, end: range.end });
+
+        res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${fileSize}`);
+        res.setHeader('Content-Length', range.end - range.start + 1);
+        res.status(206); // Partial content
+
+        stream.on('error', err => {
+            console.error('Stream error:', err);
+            if (!res.headersSent) {
+                res.status(500).send('Error streaming file');
+            }
         });
 
-        file.pipe(res);
+        stream.pipe(res);
     } else {
-        // No Range header, send full file
-        res.writeHead(200, {
-            'Content-Length': fileSize,
-            'Content-Type': mimeType,
-            'Access-Control-Allow-Origin': '*',
+        // Send entire file
+        res.setHeader('Content-Length', fileSize);
+        const stream = fs.createReadStream(filePath);
+
+        stream.on('error', err => {
+            console.error('Stream error:', err);
+            if (!res.headersSent) {
+                res.status(500).send('Error streaming file');
+            }
         });
 
-        fs.createReadStream(filePath).pipe(res);
+        stream.pipe(res);
     }
 });
+
 
 
 
