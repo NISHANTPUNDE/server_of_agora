@@ -46,13 +46,14 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const fileSize = stat.size;
     const rangeHeader = req.headers.range;
 
-    // Set common headers
+    // Set headers for download
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'audio/m4a'); // Correct Content-Type for m4a files
-    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Disposition', `attachment; filename="${decodedFilename}"`);  // Suggest file download
+    res.setHeader('Content-Length', fileSize);  // Ensure file size is specified
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    // If range is present
+    // If range is present (for large files or partial downloads)
     if (rangeHeader) {
         const ranges = rangeParser(fileSize, rangeHeader);
 
@@ -71,9 +72,8 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
 
         stream.pipe(res);
     } else {
-        // Send entire file
+        // Send entire file for download
         res.status(200);
-        res.setHeader('Content-Length', fileSize);
         const stream = fs.createReadStream(filePath);
         stream.pipe(res);
     }
