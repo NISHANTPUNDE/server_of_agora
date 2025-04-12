@@ -35,14 +35,46 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
     console.log('Serving file from path:', filePath);
-
+    
     // Check if file exists
-    if (fs.existsSync(filePath)) {
-        const mimeType = mime.lookup(filePath) || 'application/octet-stream';
-        res.setHeader('Content-Type', mimeType);
-        res.sendFile(filePath);
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+    
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+    
+    // Handle range requests
+    const range = req.headers.range;
+    if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = (end - start) + 1;
+        
+        console.log(`Range request: ${start}-${end}/${fileSize}`);
+        
+        const file = fs.createReadStream(filePath, {start, end});
+        const headers = {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Content-Type': mimeType,
+        };
+        
+        res.writeHead(206, headers);
+        file.pipe(res);
     } else {
-        res.status(404).json({ error: 'File not found' });
+        // Full file request
+        const headers = {
+            'Content-Length': fileSize,
+            'Content-Type': mimeType,
+            'Accept-Ranges': 'bytes'
+        };
+        
+        res.writeHead(200, headers);
+        fs.createReadStream(filePath).pipe(res);
     }
 });
 
