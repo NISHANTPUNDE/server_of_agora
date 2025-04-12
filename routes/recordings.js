@@ -30,6 +30,7 @@ router.post('/', async (req, res) => {
 });
 
 // Dynamic route to serve recording files
+
 router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const decodedFilename = decodeURIComponent(filename);
@@ -47,7 +48,7 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
 
     // Set common headers
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'audio/mp4'); // For m4a
+    res.setHeader('Content-Type', 'audio/m4a'); // Correct Content-Type for m4a files
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
