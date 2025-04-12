@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
 });
 
 // Dynamic route to serve recording files
-app.get('/v1/add/recordings/recordings/:adminId/:teamId/:filename', async (req, res) => {
+router.get('/recordings/:adminId/:teamId/:filename', async (req, res) => {
     const { adminId, teamId, filename } = req.params;
     const decodedFilename = decodeURIComponent(filename);
     const originalPath = path.join('recordings', adminId, teamId, decodedFilename);
@@ -86,80 +86,6 @@ app.get('/v1/add/recordings/recordings/:adminId/:teamId/:filename', async (req, 
         res.writeHead(200, head);
         fs.createReadStream(optimizedPath).pipe(res);
     }
-});
-
-
-
-router.get('/:teamid', (req, res) => {
-    const teamId = parseInt(req.params.teamid);
-    if (!teamId) {
-        return res.status(400).json({ error: 'Team ID is required' });
-    }
-
-    db.query('SELECT admin_id FROM team WHERE id = ?', [teamId], (err, results) => {
-        if (err) {
-            console.error('Database Error:', err.message);
-            return res.status(500).json({ error: 'Database query error' });
-        }
-
-        if (!results || results.length === 0) {
-            return res.status(404).json({ error: 'Team not found' });
-        }
-
-        const adminId = results[0].admin_id;
-        console.log("Admin ID:", adminId);
-
-        const dir = path.join(process.cwd(), 'recordings', String(adminId), String(teamId));
-        console.log('Directory path:', dir);
-
-        try {
-            if (!fs.existsSync(dir)) {
-                console.log('Directory does not exist:', dir);
-                return res.status(404).json({ error: 'No recordings found for this user' });
-            }
-
-            const allFiles = fs.readdirSync(dir);
-            if (allFiles.length === 0) {
-                return res.status(404).json({ error: 'No recordings found for this user' });
-            }
-
-            const twentyFourHoursAgo = new Date();
-            twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-
-            // Get files with stats and filter by ctime > 24 hours ago
-            const recentFilesWithStats = allFiles.map(file => {
-                const filePath = path.join(dir, file);
-                try {
-                    const stats = fs.statSync(filePath);
-                    return { file, ctime: stats.ctime };
-                } catch (err) {
-                    console.error(`Error checking file stats for ${file}:`, err);
-                    return null;
-                }
-            }).filter(item => item && item.ctime > twentyFourHoursAgo);
-
-            // Sort descending by ctime
-            recentFilesWithStats.sort((a, b) => b.ctime - a.ctime);
-
-            const recentFiles = recentFilesWithStats.map(item => item.file);
-
-            console.log(`Files found: ${allFiles.length}, Recent files (last 24h): ${recentFiles.length}`);
-
-            if (recentFiles.length === 0) {
-                return res.status(404).json({ error: 'No recordings found within the last 24 hours' });
-            }
-
-            const recordings = recentFiles.map(file => ({
-                filename: file,
-                url: `https://${req.get('host')}/v1/add/recordings/recordings/${adminId}/${teamId}/${encodeURIComponent(file)}`
-            }));
-
-            res.status(200).json({ recordings });
-        } catch (error) {
-            console.error('Error retrieving recordings:', error.message);
-            res.status(500).json({ error: 'Error retrieving recordings', details: error.message });
-        }
-    });
 });
 
 
