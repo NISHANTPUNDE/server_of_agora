@@ -32,7 +32,8 @@ router.post('/', async (req, res) => {
 // Dynamic route to serve recording files
 router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
     const { adminId, teamId, filename } = req.params;
-    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, filename);
+    const decodedFilename = decodeURIComponent(filename);
+    const filePath = path.join(process.cwd(), 'recordings', adminId, teamId, decodedFilename);
     console.log('Serving file from path:', filePath);
 
     // Check if file exists
@@ -42,49 +43,37 @@ router.get('/recordings/:adminId/:teamId/:filename', (req, res) => {
 
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
+    const rangeHeader = req.headers.range;
 
-    // Set the appropriate MIME type
-    res.setHeader('Content-Type', 'audio/mp4');
+    // Set common headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'audio/mp4'); // For m4a
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    // Handle range requests
-    if (req.headers.range) {
-        const ranges = rangeParser(fileSize, req.headers.range);
+    // If range is present
+    if (rangeHeader) {
+        const ranges = rangeParser(fileSize, rangeHeader);
 
         if (ranges === -1 || ranges === -2 || ranges.type !== 'bytes') {
-            // Invalid range
             res.setHeader('Content-Range', `bytes */${fileSize}`);
             return res.status(416).send('Range Not Satisfiable');
         }
 
-        const range = ranges[0]; // Get the first range
-        const stream = fs.createReadStream(filePath, { start: range.start, end: range.end });
+        const { start, end } = ranges[0];
+        const chunkSize = end - start + 1;
+        const stream = fs.createReadStream(filePath, { start, end });
 
-        res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${fileSize}`);
-        res.setHeader('Content-Length', range.end - range.start + 1);
         res.status(206); // Partial content
-
-        stream.on('error', err => {
-            console.error('Stream error:', err);
-            if (!res.headersSent) {
-                res.status(500).send('Error streaming file');
-            }
-        });
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+        res.setHeader('Content-Length', chunkSize);
 
         stream.pipe(res);
     } else {
         // Send entire file
+        res.status(200);
         res.setHeader('Content-Length', fileSize);
         const stream = fs.createReadStream(filePath);
-
-        stream.on('error', err => {
-            console.error('Stream error:', err);
-            if (!res.headersSent) {
-                res.status(500).send('Error streaming file');
-            }
-        });
-
         stream.pipe(res);
     }
 });
