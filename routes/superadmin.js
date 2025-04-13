@@ -141,9 +141,10 @@ router.post('/savehistory', async (req, res) => {
             return res.status(400).json({ message: 'Call time cannot be zero' });
         }
 
-        if (isNaN(calltime)) {
-            return res.status(400).json({ message: 'Invalid call time' });
+        if (typeof calltime !== 'string' || !/min=\d+,\s*sec=\d+/.test(calltime)) {
+            return res.status(400).json({ message: 'Invalid call time format' });
         }
+        
 
         // Fetch price from database
         const sqlPrice = 'SELECT price FROM price';
@@ -159,10 +160,25 @@ router.post('/savehistory', async (req, res) => {
 
             const pricePer1000Min = parseFloat(priceResult[0].price);
 
+            const match = calltime.match(/min=(\d+), sec=(\d+)/);
 
-            // Calculate cost
-            const cost = ((parseFloat(calltime) / 1000) * pricePer1000Min).toFixed(4);
-
+            let cost = 0; // define cost in outer scope
+            if (match) {
+                const minutes = parseInt(match[1], 10);
+                const seconds = parseInt(match[2], 10);
+              
+                // Convert to total minutes as decimal
+                const totalMinutes = minutes + seconds / 60;
+              
+                // Agora cost calculation
+                cost = ((totalMinutes / 1000) * pricePer1000Min).toFixed(4);
+              
+                console.log(`Call Duration: ${totalMinutes.toFixed(2)} minutes`);
+                console.log(`Agora Audio Call Cost: $${cost}`);
+              } else {
+                console.log("Invalid calltime format.");
+              }
+              
             // Ensure cost is a valid number
             if (isNaN(cost) || cost === 'NaN') {
                 return res.status(400).json({ message: 'Error calculating cost' });
