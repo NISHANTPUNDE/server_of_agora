@@ -144,7 +144,7 @@ router.post('/savehistory', async (req, res) => {
         if (typeof calltime !== 'string' || !/min=\d+,\s*sec=\d+/.test(calltime)) {
             return res.status(400).json({ message: 'Invalid call time format' });
         }
-        
+
 
         // Fetch price from database
         const sqlPrice = 'SELECT price FROM price';
@@ -166,19 +166,19 @@ router.post('/savehistory', async (req, res) => {
             if (match) {
                 const minutes = parseInt(match[1], 10);
                 const seconds = parseInt(match[2], 10);
-              
+
                 // Convert to total minutes as decimal
                 const totalMinutes = minutes + seconds / 60;
-              
+
                 // Agora cost calculation
                 cost = ((totalMinutes / 1000) * pricePer1000Min).toFixed(4);
-              
+
                 console.log(`Call Duration: ${totalMinutes.toFixed(2)} minutes`);
                 console.log(`Agora Audio Call Cost: $${cost}`);
-              } else {
+            } else {
                 console.log("Invalid calltime format.");
-              }
-              
+            }
+
             // Ensure cost is a valid number
             if (isNaN(cost) || cost === 'NaN') {
                 return res.status(400).json({ message: 'Error calculating cost' });
@@ -219,6 +219,7 @@ router.get('/gethistory', (req, res) => {
 })
 
 router.delete('/deletehistory/:id', (req, res) => {
+    console.log("request data",)
     try {
         const { id } = req.params;
         console.log(id)
@@ -244,6 +245,41 @@ router.delete('/deletehistory/:id', (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 });
+
+router.post('/deletehistory', (req, res) => {
+    console.log("req", req.body.data);
+    const { superadminname, fromDate, toDate, selectedUser } = req.body.data;
+
+    if (superadminname !== 'admin@123') {
+        return res.status(403).json({ message: 'Unauthorized access' });
+    }
+
+    if (!fromDate || !toDate) {
+        return res.status(400).json({ message: 'Both fromDate and toDate are required' });
+    }
+
+    let sql = `DELETE FROM callhistory WHERE date BETWEEN ? AND ?`;
+    const params = [fromDate, toDate];
+
+    if (selectedUser !== 'all') {
+        sql += ` AND name = ?`;
+        params.push(selectedUser);
+    }
+
+    db.query(sql, params, (err, result) => {
+        if (err) {
+            console.error('❌ Error deleting call history:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        res.json({
+            message: 'Call history deleted successfully',
+            deletedRows: result.affectedRows
+        });
+    });
+});
+
+
 
 
 // ✅ Correctly exporting the router
