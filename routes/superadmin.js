@@ -206,7 +206,9 @@ console.log("billableMinutes",billableMinutes)
 
 router.get('/gethistory', (req, res) => {
     try {
-        const sql = 'SELECT * FROM callhistory';
+        // const sql = 'SELECT * FROM callhistory';
+        const sql = 'SELECT * FROM callhistory ORDER BY id DESC';
+
         db.query(sql, (err, result) => {
             if (err) {
                 console.error('❌ Error during Save history:', err);
