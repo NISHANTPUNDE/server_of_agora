@@ -129,7 +129,7 @@ router.get('/getprice', (req, res) => {
 
 router.post('/savehistory', async (req, res) => {
     try {
-        const { name, date, calltime, userid } = req.body;
+        const { name, date, calltime, userid, billableMinutes } = req.body;
         console.log("req.body", req.body)
 
         // Validate input
@@ -142,6 +142,7 @@ router.post('/savehistory', async (req, res) => {
         }
 
         if (typeof calltime !== 'string' || !/min=\d+,\s*sec=\d+/.test(calltime)) {
+            console.log("typeof calltime",typeof calltime)
             return res.status(400).json({ message: 'Invalid call time format' });
         }
 
@@ -169,9 +170,10 @@ router.post('/savehistory', async (req, res) => {
 
                 // Convert to total minutes as decimal
                 const totalMinutes = minutes + seconds / 60;
+console.log("billableMinutes",billableMinutes)
 
                 // Agora cost calculation
-                cost = ((totalMinutes / 1000) * pricePer1000Min).toFixed(4);
+                cost = ((billableMinutes / 1000) * pricePer1000Min).toFixed(4);
 
                 console.log(`Call Duration: ${totalMinutes.toFixed(2)} minutes`);
                 console.log(`Agora Audio Call Cost: $${cost}`);
