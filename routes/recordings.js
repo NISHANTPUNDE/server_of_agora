@@ -291,7 +291,7 @@ router.get('/recordings/admin/:adminId', (req, res) => {
                     const teamName = rows && rows.length > 0 ? rows[0].name : null;
 
                     files.forEach(file => {
-                        recordings.push({
+                        recordings.unshift({
                             filename: file,
                             teamId: teamId,
                             teamName: teamName,
