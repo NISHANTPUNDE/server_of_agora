@@ -119,7 +119,8 @@ const AdminService = {
 
     loginAdmin: async (username) => {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM admin WHERE username = ?`;
+            const sql = `SELECT * FROM admin WHERE BINARY username = ?`;
+            console.log(sql, username)
             db.query(sql, [username], (err, results) => {
                 if (err) {
                     console.error("Database Error:", err);
